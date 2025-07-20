@@ -1,1 +1,4 @@
 project_id = "ebwbrjkqrsgumlwvhrhb"
+
+[functions.location-api]
+verify_jwt = false
