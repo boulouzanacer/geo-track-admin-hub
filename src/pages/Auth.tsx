@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import LanguageSelector from '@/components/LanguageSelector';
+
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -74,15 +74,10 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>{t('auth.title')}</CardTitle>
-              <CardDescription>
-                {t('auth.description')}
-              </CardDescription>
-            </div>
-            <LanguageSelector />
-          </div>
+          <CardTitle>{t('auth.title')}</CardTitle>
+          <CardDescription>
+            {t('auth.description')}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">

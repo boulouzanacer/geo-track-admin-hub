@@ -13,6 +13,9 @@ import { UserManagement } from '@/components/UserManagement';
 import { PhoneManagement } from '@/components/PhoneManagement';
 import { UserSelector } from '@/components/UserSelector';
 import { TrackingFilter } from '@/components/TrackingFilter';
+import LanguageSelector from '@/components/LanguageSelector';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -45,6 +48,7 @@ const Dashboard = () => {
   const [endTime, setEndTime] = useState<string>('18:00');
   const [trackingData, setTrackingData] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [isTrackingFilterOpen, setIsTrackingFilterOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -211,6 +215,7 @@ const Dashboard = () => {
             <h1 className="text-xl font-semibold">{t('auth.title')}</h1>
           </div>
           <div className="flex items-center space-x-4">
+            <LanguageSelector />
             <span className="text-sm text-muted-foreground">
               {t('dashboard.welcome')}, {userProfile.name} ({userProfile.role})
             </span>
@@ -227,21 +232,21 @@ const Dashboard = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
               <CardTitle className="text-sm font-medium">{t('dashboard.totalPhones')}</CardTitle>
               <Smartphone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-3">
               <div className="text-2xl font-bold">{phones.length}</div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
               <CardTitle className="text-sm font-medium">{t('dashboard.activeUsers')}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-3">
               <div className="text-2xl font-bold">
                 {new Set(phones.map(p => p.user_id)).size}
               </div>
@@ -249,11 +254,11 @@ const Dashboard = () => {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
               <CardTitle className="text-sm font-medium">{t('dashboard.recentUpdates')}</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-3">
               <div className="text-2xl font-bold">
                 {phones.filter(p => {
                   const lastUpdate = new Date(p.last_update);
@@ -292,17 +297,27 @@ const Dashboard = () => {
 
             {/* Tracking Filter */}
             <div className="mb-4">
-              <TrackingFilter
-                selectedDate={trackingDate}
-                startTime={startTime}
-                endTime={endTime}
-                onDateChange={setTrackingDate}
-                onStartTimeChange={setStartTime}
-                onEndTimeChange={setEndTime}
-                onApplyFilter={fetchTrackingData}
-                onClearFilter={clearTrackingFilter}
-                isLoading={loading}
-              />
+              <Collapsible open={isTrackingFilterOpen} onOpenChange={setIsTrackingFilterOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 mb-2">
+                    Movement Tracking Filter
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isTrackingFilterOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <TrackingFilter
+                    selectedDate={trackingDate}
+                    startTime={startTime}
+                    endTime={endTime}
+                    onDateChange={setTrackingDate}
+                    onStartTimeChange={setStartTime}
+                    onEndTimeChange={setEndTime}
+                    onApplyFilter={fetchTrackingData}
+                    onClearFilter={clearTrackingFilter}
+                    isLoading={loading}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
             </div>
             
             {/* Main Layout */}
