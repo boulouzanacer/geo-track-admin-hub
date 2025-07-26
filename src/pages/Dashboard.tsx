@@ -3,10 +3,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { MapPin, Users, Smartphone, LogOut } from 'lucide-react';
 import MapView from '@/components/MapView';
 import PhoneList from '@/components/PhoneList';
+import { UserManagement } from '@/components/UserManagement';
 
 interface UserProfile {
   id: string;
@@ -193,29 +195,47 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Phone List */}
-          <div className="lg:col-span-1">
-            <PhoneList
-              phones={phones}
-              selectedPhone={selectedPhone}
-              onSelectPhone={setSelectedPhone}
-              userRole={userProfile.role}
-              currentUserId={userProfile.id}
-              loading={loading}
-              onRefresh={fetchPhones}
-            />
-          </div>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            {userProfile.role === 'admin' && (
+              <TabsTrigger value="users">User Management</TabsTrigger>
+            )}
+          </TabsList>
+          
+          <TabsContent value="overview">
+            {/* Main Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Phone List */}
+              <div className="lg:col-span-1">
+                <PhoneList
+                  phones={phones}
+                  selectedPhone={selectedPhone}
+                  onSelectPhone={setSelectedPhone}
+                  userRole={userProfile.role}
+                  currentUserId={userProfile.id}
+                  loading={loading}
+                  onRefresh={fetchPhones}
+                />
+              </div>
 
-          {/* Map */}
-          <div className="lg:col-span-3">
-            <MapView
-              selectedPhone={selectedPhone}
-              phones={phones}
-            />
-          </div>
-        </div>
+              {/* Map */}
+              <div className="lg:col-span-3">
+                <MapView
+                  selectedPhone={selectedPhone}
+                  phones={phones}
+                />
+              </div>
+            </div>
+          </TabsContent>
+          
+          {userProfile.role === 'admin' && (
+            <TabsContent value="users">
+              <UserManagement />
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </div>
   );
