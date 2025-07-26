@@ -137,7 +137,7 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [0, 0],
-      zoom: 2
+      zoom: 14
     });
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
