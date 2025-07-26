@@ -49,10 +49,21 @@ const handler = async (req: Request): Promise<Response> => {
         .from('phones')
         .select('id')
         .eq('phone_id', phone_id)
-        .single();
+        .maybeSingle();
 
-      if (phoneError || !phone) {
-        console.error('Phone not found:', phoneError);
+      if (phoneError) {
+        console.error('Database error finding phone:', phoneError);
+        return new Response(
+          JSON.stringify({ error: 'Database error' }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
+      }
+
+      if (!phone) {
+        console.error('Phone not found for phone_id:', phone_id);
         return new Response(
           JSON.stringify({ error: 'Phone not found' }),
           {
