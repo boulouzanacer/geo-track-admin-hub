@@ -51,18 +51,33 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
         const locations: {[phoneId: string]: {lat: number, lng: number}} = {};
         
         for (const phone of phones) {
-          const response = await fetch(`/api/location-api/phone/${phone.phone_id}`, {
-            method: 'GET'
-          });
-          
-          if (response.ok) {
-            const locationData = await response.json();
-            if (locationData.latitude && locationData.longitude) {
-              locations[phone.phone_id] = {
-                lat: locationData.latitude,
-                lng: locationData.longitude
-              };
+          try {
+            // Construct the correct edge function URL with the phone path
+            const functionUrl = `https://ebwbrjkqrsgumlwvhrhb.supabase.co/functions/v1/location-api/phone/${phone.phone_id}`;
+            
+            const response = await fetch(functionUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVid2JyamtxcnNndW1sd3ZocmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjg3MDUsImV4cCI6MjA2ODYwNDcwNX0.DdJjvA0S3rMMAqvxfLKMPhYo2fQkwRrHj1KFOKgmXOc`,
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              const locationData = data.location;
+              if (locationData && locationData.latitude && locationData.longitude) {
+                locations[phone.phone_id] = {
+                  lat: parseFloat(locationData.latitude),
+                  lng: parseFloat(locationData.longitude)
+                };
+                console.log(`Location found for phone ${phone.phone_id}:`, locations[phone.phone_id]);
+              }
+            } else {
+              console.log(`No location data found for phone ${phone.phone_id}`);
             }
+          } catch (err) {
+            console.error(`Error fetching location for phone ${phone.phone_id}:`, err);
           }
         }
         
