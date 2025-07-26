@@ -132,7 +132,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
     const loader = new Loader({
       apiKey: googleMapsKey,
       version: 'weekly',
-      libraries: ['geometry']
+      libraries: ['geometry', 'places']
     });
 
     loader.load().then(() => {
