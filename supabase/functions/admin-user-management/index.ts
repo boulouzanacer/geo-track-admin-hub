@@ -64,8 +64,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Unauthorized');
     }
 
-    // Check if user is admin
-    const { data: userProfile, error: profileError } = await supabase
+    // Check if user is admin using admin client
+    const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('auth_user_id', user.id)
