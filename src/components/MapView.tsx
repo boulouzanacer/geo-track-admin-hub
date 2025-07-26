@@ -210,128 +210,154 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
       }
     });
 
-    // Add tracking lines for movement data
+    // Add tracking routes for movement data
     if (Object.keys(trackingData).length > 0) {
-      console.log('Adding tracking lines:', trackingData);
+      console.log('Adding tracking routes:', trackingData);
       
-      Object.entries(trackingData).forEach(([phoneId, data]: [string, any]) => {
+      Object.entries(trackingData).forEach(async ([phoneId, data]: [string, any]) => {
         if (data.allLocations && data.allLocations.length > 1) {
-          // Create path from all locations
-          const coordinates = data.allLocations
-            .filter((loc: any) => loc.latitude && loc.longitude)
-            .map((loc: any) => [parseFloat(loc.longitude), parseFloat(loc.latitude)]);
+          const locations = data.allLocations.filter((loc: any) => loc.latitude && loc.longitude);
           
-          if (coordinates.length > 1) {
+          if (locations.length > 1) {
             // Remove existing tracking elements
-            const lineId = `tracking-line-${phoneId}`;
-            const pointsId = `tracking-points-${phoneId}`;
+            const routeId = `tracking-route-${phoneId}`;
+            const waypointsId = `tracking-waypoints-${phoneId}`;
             
-            if (map.current.getSource(lineId)) {
-              map.current.removeLayer(lineId);
-              map.current.removeSource(lineId);
+            if (map.current.getSource(routeId)) {
+              map.current.removeLayer(routeId);
+              map.current.removeSource(routeId);
             }
-            if (map.current.getSource(pointsId)) {
-              map.current.removeLayer(pointsId);
-              map.current.removeSource(pointsId);
+            if (map.current.getSource(waypointsId)) {
+              map.current.removeLayer(waypointsId);
+              map.current.removeSource(waypointsId);
             }
             
-            // Clear existing arrows
-            const existingArrows = document.querySelectorAll('.tracking-arrow');
+            // Clear existing markers
+            const existingArrows = document.querySelectorAll('.tracking-arrow, .tracking-marker');
             existingArrows.forEach(arrow => arrow.remove());
             
-            // Add tracking line
-            map.current.addSource(lineId, {
-              type: 'geojson',
-              data: {
-                type: 'Feature',
-                properties: {},
-                geometry: {
-                  type: 'LineString',
-                  coordinates: coordinates
+            // Get route between consecutive points
+            const routeSegments = [];
+            for (let i = 0; i < locations.length - 1; i++) {
+              const start = locations[i];
+              const end = locations[i + 1];
+              
+              try {
+                const routeUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?geometries=geojson&access_token=${mapboxToken}`;
+                const response = await fetch(routeUrl);
+                const routeData = await response.json();
+                
+                if (routeData.routes && routeData.routes.length > 0) {
+                  const route = routeData.routes[0];
+                  routeSegments.push(...route.geometry.coordinates);
+                } else {
+                  // Fallback to straight line if no route found
+                  routeSegments.push([parseFloat(start.longitude), parseFloat(start.latitude)]);
+                  routeSegments.push([parseFloat(end.longitude), parseFloat(end.latitude)]);
                 }
+              } catch (error) {
+                console.error('Error fetching route:', error);
+                // Fallback to straight line
+                routeSegments.push([parseFloat(start.longitude), parseFloat(start.latitude)]);
+                routeSegments.push([parseFloat(end.longitude), parseFloat(end.latitude)]);
               }
-            });
-            
-            map.current.addLayer({
-              id: lineId,
-              type: 'line',
-              source: lineId,
-              layout: {
-                'line-join': 'round',
-                'line-cap': 'round'
-              },
-              paint: {
-                'line-color': '#ef4444',
-                'line-width': 4,
-                'line-opacity': 0.8
-              }
-            });
-            
-            // Add direction arrows along the path
-            for (let i = 0; i < coordinates.length - 1; i++) {
-              const start = coordinates[i];
-              const end = coordinates[i + 1];
-              const bearing = getBearing(start, end);
-              
-              // Create arrow element
-              const arrowEl = document.createElement('div');
-              arrowEl.className = 'tracking-arrow';
-              arrowEl.style.width = '0';
-              arrowEl.style.height = '0';
-              arrowEl.style.borderLeft = '6px solid transparent';
-              arrowEl.style.borderRight = '6px solid transparent';
-              arrowEl.style.borderBottom = '10px solid #ef4444';
-              arrowEl.style.transform = `rotate(${bearing}deg)`;
-              arrowEl.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))';
-              
-              // Position arrow at the end of each segment
-              new mapboxgl.Marker(arrowEl)
-                .setLngLat(end as [number, number])
-                .addTo(map.current!);
             }
             
-            // Add start marker (green)
-            const startEl = document.createElement('div');
-            startEl.className = 'tracking-marker start-marker';
-            startEl.style.width = '12px';
-            startEl.style.height = '12px';
-            startEl.style.borderRadius = '50%';
-            startEl.style.backgroundColor = '#22c55e';
-            startEl.style.border = '2px solid white';
-            startEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-            
-            new mapboxgl.Marker(startEl)
-              .setLngLat(coordinates[0] as [number, number])
-              .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
-                <div class="p-2">
-                  <h4 class="font-semibold text-green-600">Start Point</h4>
-                  <p class="text-sm">${data.allLocations[0].timestamp}</p>
-                </div>
-              `))
-              .addTo(map.current!);
-            
-            // Add end marker (red)
-            const endEl = document.createElement('div');
-            endEl.className = 'tracking-marker end-marker';
-            endEl.style.width = '12px';
-            endEl.style.height = '12px';
-            endEl.style.borderRadius = '50%';
-            endEl.style.backgroundColor = '#ef4444';
-            endEl.style.border = '2px solid white';
-            endEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-            
-            new mapboxgl.Marker(endEl)
-              .setLngLat(coordinates[coordinates.length - 1] as [number, number])
-              .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
-                <div class="p-2">
-                  <h4 class="font-semibold text-red-600">End Point</h4>
-                  <p class="text-sm">${data.allLocations[data.allLocations.length - 1].timestamp}</p>
-                </div>
-              `))
-              .addTo(map.current!);
-            
-            // Extend bounds to include tracking path
-            coordinates.forEach(coord => bounds.extend(coord));
+            // Add the complete route
+            if (routeSegments.length > 1) {
+              map.current.addSource(routeId, {
+                type: 'geojson',
+                data: {
+                  type: 'Feature',
+                  properties: {},
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: routeSegments
+                  }
+                }
+              });
+              
+              map.current.addLayer({
+                id: routeId,
+                type: 'line',
+                source: routeId,
+                layout: {
+                  'line-join': 'round',
+                  'line-cap': 'round'
+                },
+                paint: {
+                  'line-color': '#3b82f6',
+                  'line-width': 5,
+                  'line-opacity': 0.8
+                }
+              });
+              
+              // Add waypoint markers
+              locations.forEach((location: any, index: number) => {
+                const coord = [parseFloat(location.longitude), parseFloat(location.latitude)];
+                
+                let markerColor = '#6b7280'; // gray for waypoints
+                let markerSize = '8px';
+                let popupTitle = `Waypoint ${index + 1}`;
+                
+                if (index === 0) {
+                  markerColor = '#22c55e'; // green for start
+                  markerSize = '12px';
+                  popupTitle = 'Start Point';
+                } else if (index === locations.length - 1) {
+                  markerColor = '#ef4444'; // red for end
+                  markerSize = '12px';
+                  popupTitle = 'End Point';
+                }
+                
+                const markerEl = document.createElement('div');
+                markerEl.className = 'tracking-marker';
+                markerEl.style.width = markerSize;
+                markerEl.style.height = markerSize;
+                markerEl.style.borderRadius = '50%';
+                markerEl.style.backgroundColor = markerColor;
+                markerEl.style.border = '2px solid white';
+                markerEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+                
+                new mapboxgl.Marker(markerEl)
+                  .setLngLat(coord as [number, number])
+                  .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                    <div class="p-2">
+                      <h4 class="font-semibold">${popupTitle}</h4>
+                      <p class="text-sm">${new Date(location.timestamp).toLocaleString()}</p>
+                      <p class="text-xs text-gray-500">Lat: ${location.latitude}, Lng: ${location.longitude}</p>
+                    </div>
+                  `))
+                  .addTo(map.current!);
+                
+                // Extend bounds
+                bounds.extend(coord as [number, number]);
+              });
+              
+              // Add direction arrows along the route
+              const arrowInterval = Math.floor(routeSegments.length / 5); // Show 5 arrows along the route
+              for (let i = arrowInterval; i < routeSegments.length; i += arrowInterval) {
+                if (i < routeSegments.length - 1) {
+                  const start = routeSegments[i - 1] || routeSegments[i];
+                  const end = routeSegments[i];
+                  const bearing = getBearing(start, end);
+                  
+                  const arrowEl = document.createElement('div');
+                  arrowEl.className = 'tracking-arrow';
+                  arrowEl.style.width = '0';
+                  arrowEl.style.height = '0';
+                  arrowEl.style.borderLeft = '5px solid transparent';
+                  arrowEl.style.borderRight = '5px solid transparent';
+                  arrowEl.style.borderBottom = '8px solid #3b82f6';
+                  arrowEl.style.transform = `rotate(${bearing}deg)`;
+                  arrowEl.style.filter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))';
+                  
+                  new mapboxgl.Marker(arrowEl)
+                    .setLngLat(end as [number, number])
+                    .addTo(map.current!);
+                }
+              }
+            }
           }
         }
       });
