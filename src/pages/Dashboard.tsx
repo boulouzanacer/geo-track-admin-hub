@@ -10,6 +10,7 @@ import MapView from '@/components/MapView';
 import PhoneList from '@/components/PhoneList';
 import { UserManagement } from '@/components/UserManagement';
 import { PhoneManagement } from '@/components/PhoneManagement';
+import { UserSelector } from '@/components/UserSelector';
 
 interface UserProfile {
   id: string;
@@ -35,6 +36,7 @@ const Dashboard = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [phones, setPhones] = useState<Phone[]>([]);
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -206,12 +208,26 @@ const Dashboard = () => {
           </TabsList>
           
           <TabsContent value="overview">
+            {/* User Filter for Admins */}
+            {userProfile.role === 'admin' && (
+              <div className="mb-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium">Filter by user:</span>
+                  <UserSelector
+                    selectedUserId={selectedUserId}
+                    onUserSelect={setSelectedUserId}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            )}
+            
             {/* Main Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Phone List */}
               <div className="lg:col-span-1">
                 <PhoneList
-                  phones={phones}
+                  phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
                   selectedPhone={selectedPhone}
                   onSelectPhone={setSelectedPhone}
                   userRole={userProfile.role}
@@ -225,7 +241,7 @@ const Dashboard = () => {
               <div className="lg:col-span-3">
                 <MapView
                   selectedPhone={selectedPhone}
-                  phones={phones}
+                  phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
                 />
               </div>
             </div>
