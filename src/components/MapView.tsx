@@ -164,16 +164,31 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
         hasValidLocations = true;
         bounds.extend([location.lng, location.lat]);
 
-        // Create marker element
+        // Create marker element with car icon
         const el = document.createElement('div');
         el.className = 'phone-marker';
-        el.style.width = '20px';
-        el.style.height = '20px';
-        el.style.borderRadius = '50%';
-        el.style.border = '2px solid white';
-        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        el.style.width = '30px';
+        el.style.height = '30px';
         el.style.cursor = 'pointer';
-        el.style.backgroundColor = selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        
+        // Create car icon SVG
+        const carIcon = `
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 17h2m10 0h2M7 17v4l-2-2v-2m8-2v4l2-2v-2m-6-15l1.5 7H7l1.5-7M6 8h12l1 4H5l1-4z" 
+                  stroke="${selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6'}" 
+                  stroke-width="2" 
+                  stroke-linecap="round" 
+                  stroke-linejoin="round" 
+                  fill="${selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6'}" 
+                  fill-opacity="0.8"/>
+          </svg>
+        `;
+        
+        el.innerHTML = carIcon;
+        el.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))';
 
         // Create popup
         const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
