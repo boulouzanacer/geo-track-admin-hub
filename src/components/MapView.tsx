@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Navigation, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Phone {
   id: string;
@@ -21,15 +24,153 @@ interface MapViewProps {
 }
 
 const MapView = ({ selectedPhone, phones }: MapViewProps) => {
-  const [currentLocation, setCurrentLocation] = useState<{
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
-    timestamp: string;
-  } | null>(null);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number}}>({});
+  const [loading, setLoading] = useState(true);
 
-  // For now, we'll show a placeholder map
-  // In a real implementation, you would integrate with Google Maps API
+  // Get Mapbox token from Supabase secrets
+  useEffect(() => {
+    const getMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        if (error) throw error;
+        setMapboxToken(data.token);
+      } catch (error) {
+        console.error('Error getting Mapbox token:', error);
+      }
+    };
+    getMapboxToken();
+  }, []);
+
+  // Fetch phone locations
+  useEffect(() => {
+    const fetchPhoneLocations = async () => {
+      try {
+        const locations: {[phoneId: string]: {lat: number, lng: number}} = {};
+        
+        for (const phone of phones) {
+          const response = await fetch(`/api/location-api/phone/${phone.phone_id}`, {
+            method: 'GET'
+          });
+          
+          if (response.ok) {
+            const locationData = await response.json();
+            if (locationData.latitude && locationData.longitude) {
+              locations[phone.phone_id] = {
+                lat: locationData.latitude,
+                lng: locationData.longitude
+              };
+            }
+          }
+        }
+        
+        setPhoneLocations(locations);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching phone locations:', error);
+        setLoading(false);
+      }
+    };
+
+    if (phones.length > 0) {
+      fetchPhoneLocations();
+    }
+  }, [phones]);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken) return;
+
+    mapboxgl.accessToken = mapboxToken;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [0, 0],
+      zoom: 2
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    return () => {
+      map.current?.remove();
+    };
+  }, [mapboxToken]);
+
+  // Add phone markers to map
+  useEffect(() => {
+    if (!map.current || Object.keys(phoneLocations).length === 0) return;
+
+    // Clear existing markers
+    const existingMarkers = document.querySelectorAll('.phone-marker');
+    existingMarkers.forEach(marker => marker.remove());
+
+    let bounds = new mapboxgl.LngLatBounds();
+    let hasValidLocations = false;
+
+    phones.forEach(phone => {
+      const location = phoneLocations[phone.phone_id];
+      if (location) {
+        hasValidLocations = true;
+        bounds.extend([location.lng, location.lat]);
+
+        // Create marker element
+        const el = document.createElement('div');
+        el.className = 'phone-marker';
+        el.style.width = '20px';
+        el.style.height = '20px';
+        el.style.borderRadius = '50%';
+        el.style.border = '2px solid white';
+        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        el.style.cursor = 'pointer';
+        el.style.backgroundColor = selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6';
+
+        // Create popup
+        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+          <div class="p-2">
+            <h4 class="font-semibold">${phone.name}</h4>
+            <p class="text-sm text-gray-600">ID: ${phone.phone_id}</p>
+            <p class="text-sm text-gray-600">Last update: ${formatDistanceToNow(new Date(phone.last_update), { addSuffix: true })}</p>
+          </div>
+        `);
+
+        // Add marker to map
+        new mapboxgl.Marker(el)
+          .setLngLat([location.lng, location.lat])
+          .setPopup(popup)
+          .addTo(map.current!);
+      }
+    });
+
+    // Fit map to show all markers
+    if (hasValidLocations) {
+      map.current.fitBounds(bounds, { padding: 50 });
+    }
+  }, [phoneLocations, phones, selectedPhone]);
+
+  if (!mapboxToken) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Location Map
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">Loading Map...</h3>
+              <p className="text-sm text-muted-foreground">Getting Mapbox configuration</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card className="h-full">
@@ -46,72 +187,8 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
       </CardHeader>
       <CardContent>
         <div className="relative">
-          {/* Placeholder Map */}
-          <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20">
-              {/* Grid pattern to simulate map */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="grid grid-cols-10 grid-rows-10 h-full w-full">
-                  {[...Array(100)].map((_, i) => (
-                    <div key={i} className="border border-gray-300 dark:border-gray-600"></div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Phone markers */}
-              {phones.map((phone, index) => (
-                <div
-                  key={phone.id}
-                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
-                    selectedPhone?.id === phone.id ? 'z-20' : 'z-10'
-                  }`}
-                  style={{
-                    left: `${20 + (index * 15) % 60}%`,
-                    top: `${20 + (index * 10) % 60}%`,
-                  }}
-                >
-                  <div className={`relative ${selectedPhone?.id === phone.id ? 'scale-150' : ''} transition-transform`}>
-                    <div className={`w-4 h-4 rounded-full border-2 border-white shadow-lg ${
-                      selectedPhone?.id === phone.id ? 'bg-red-500' : 'bg-blue-500'
-                    }`}></div>
-                    {selectedPhone?.id === phone.id && (
-                      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 px-2 py-1 rounded shadow-lg text-xs whitespace-nowrap">
-                        {phone.name}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="text-center z-30 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg">
-              <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Map Integration Placeholder</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Google Maps will be integrated here to show real phone locations
-              </p>
-              {selectedPhone ? (
-                <div className="space-y-2">
-                  <Badge variant="outline">{selectedPhone.name}</Badge>
-                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    Last update: {formatDistanceToNow(new Date(selectedPhone.last_update), { addSuffix: true })}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Select a phone from the list to view its location
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Map Controls */}
-          <div className="absolute top-4 right-4 space-y-2">
-            <button className="bg-white dark:bg-gray-800 p-2 rounded shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700">
-              <Navigation className="h-4 w-4" />
-            </button>
-          </div>
+          {/* Real Mapbox Map */}
+          <div ref={mapContainer} className="w-full h-96 rounded-lg" />
 
           {/* Location Info Panel */}
           {selectedPhone && (
