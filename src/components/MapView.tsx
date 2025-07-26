@@ -192,9 +192,17 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
       }
     });
 
-    // Fit map to show all markers
+    // Fit map to show all markers or center on single location
     if (hasValidLocations) {
-      map.current.fitBounds(bounds, { padding: 50 });
+      if (phones.filter(phone => phoneLocations[phone.phone_id]).length === 1) {
+        // For single location, center with default zoom
+        const singleLocation = Object.values(phoneLocations)[0];
+        map.current.setCenter([singleLocation.lng, singleLocation.lat]);
+        map.current.setZoom(10);
+      } else {
+        // For multiple locations, fit bounds with minimum zoom
+        map.current.fitBounds(bounds, { padding: 50, maxZoom: 10 });
+      }
     }
   }, [phoneLocations, phones, selectedPhone]);
 
