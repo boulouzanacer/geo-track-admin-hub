@@ -218,147 +218,200 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
           const locations = data.allLocations.filter((loc: any) => loc.latitude && loc.longitude);
           
           if (locations.length > 1) {
-            const directionsService = new google.maps.DirectionsService();
-            const directionsRenderer = new google.maps.DirectionsRenderer({
-              polylineOptions: {
-                strokeColor: '#3b82f6',
-                strokeWeight: 5,
-                strokeOpacity: 0.8
-              },
-              markerOptions: {
-                visible: false // We'll add custom markers
+            // Filter out locations that are too far apart (likely GPS errors)
+            const filteredLocations = [locations[0]];
+            for (let i = 1; i < locations.length; i++) {
+              const prevLoc = filteredLocations[filteredLocations.length - 1];
+              const currLoc = locations[i];
+              
+              // Calculate distance using Haversine formula
+              const R = 6371; // Earth's radius in km
+              const dLat = (parseFloat(currLoc.latitude) - parseFloat(prevLoc.latitude)) * Math.PI / 180;
+              const dLon = (parseFloat(currLoc.longitude) - parseFloat(prevLoc.longitude)) * Math.PI / 180;
+              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                       Math.cos(parseFloat(prevLoc.latitude) * Math.PI / 180) * Math.cos(parseFloat(currLoc.latitude) * Math.PI / 180) *
+                       Math.sin(dLon/2) * Math.sin(dLon/2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              const distance = R * c;
+              
+              // Only include if distance is reasonable (less than 50km between consecutive points)
+              if (distance < 50) {
+                filteredLocations.push(currLoc);
+              } else {
+                console.log(`Filtering out location jump: ${distance.toFixed(2)}km`);
               }
-            });
+            }
 
-            directionsRenderer.setMap(map.current!);
-            routesRef.current.push(directionsRenderer);
-
-            // Calculate trajectory info
-            let totalDistance = 0;
-            const startTime = new Date(locations[0].timestamp);
-            const endTime = new Date(locations[locations.length - 1].timestamp);
-            const totalDuration = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // minutes
-
-            // Create waypoints for Google Directions
-            const origin = new google.maps.LatLng(
-              parseFloat(locations[0].latitude),
-              parseFloat(locations[0].longitude)
-            );
-            const destination = new google.maps.LatLng(
-              parseFloat(locations[locations.length - 1].latitude),
-              parseFloat(locations[locations.length - 1].longitude)
-            );
+            console.log(`Filtered locations: ${locations.length} → ${filteredLocations.length}`);
             
-            const waypoints = locations.slice(1, -1).map((loc: any) => ({
-              location: new google.maps.LatLng(parseFloat(loc.latitude), parseFloat(loc.longitude)),
-              stopover: true
-            }));
-
-            try {
-              console.log('Attempting to calculate route with:', {
-                origin: `${origin.lat()}, ${origin.lng()}`,
-                destination: `${destination.lat()}, ${destination.lng()}`,
-                waypointsCount: waypoints.length
+            if (filteredLocations.length > 1) {
+              const directionsService = new google.maps.DirectionsService();
+              const directionsRenderer = new google.maps.DirectionsRenderer({
+                polylineOptions: {
+                  strokeColor: '#3b82f6',
+                  strokeWeight: 5,
+                  strokeOpacity: 0.8
+                },
+                markerOptions: {
+                  visible: false // We'll add custom markers
+                }
               });
 
-              const result = await directionsService.route({
-                origin,
-                destination,
-                waypoints: waypoints.slice(0, 8), // Reduce waypoints to avoid quota issues
-                travelMode: google.maps.TravelMode.DRIVING,
-                optimizeWaypoints: false
-              });
+              directionsRenderer.setMap(map.current!);
+              routesRef.current.push(directionsRenderer);
 
-              console.log('Directions API result:', result);
+              // Calculate trajectory info
+              let totalDistance = 0;
+              const startTime = new Date(filteredLocations[0].timestamp);
+              const endTime = new Date(filteredLocations[filteredLocations.length - 1].timestamp);
+              const totalDuration = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // minutes
 
-              if (result.routes[0]) {
-                directionsRenderer.setDirections(result);
+              // Only use first and last points for Google Directions to avoid ZERO_RESULTS
+              const origin = new google.maps.LatLng(
+                parseFloat(filteredLocations[0].latitude),
+                parseFloat(filteredLocations[0].longitude)
+              );
+              const destination = new google.maps.LatLng(
+                parseFloat(filteredLocations[filteredLocations.length - 1].latitude),
+                parseFloat(filteredLocations[filteredLocations.length - 1].longitude)
+              );
+
+              try {
+                console.log('Attempting route between start and end only');
                 
-                // Calculate total distance
-                result.routes[0].legs.forEach(leg => {
-                  if (leg.distance) {
-                    totalDistance += leg.distance.value; // meters
-                  }
+                const result = await directionsService.route({
+                  origin,
+                  destination,
+                  travelMode: google.maps.TravelMode.DRIVING,
+                  optimizeWaypoints: false
                 });
 
-                // Update trajectory info
-                setTrajectoryInfo(prev => ({
-                  ...prev,
-                  [phoneId]: {
-                    distance: totalDistance / 1000, // convert to km
-                    duration: totalDuration,
-                    positions: locations.length
-                  }
-                }));
-
-                // Add custom markers for start, end, and waypoints
-                locations.forEach((location: any, index: number) => {
-                  const position = new google.maps.LatLng(
-                    parseFloat(location.latitude),
-                    parseFloat(location.longitude)
-                  );
+                if (result.routes[0]) {
+                  directionsRenderer.setDirections(result);
                   
-                  let markerColor = '#6b7280'; // gray for waypoints
-                  let markerSize = 6;
-                  let popupTitle = `Waypoint ${index + 1}`;
-                  
-                  if (index === 0) {
-                    markerColor = '#22c55e'; // green for start
-                    markerSize = 8;
-                    popupTitle = 'Start Point';
-                  } else if (index === locations.length - 1) {
-                    markerColor = '#ef4444'; // red for end
-                    markerSize = 8;
-                    popupTitle = 'End Point';
-                  }
-                  
-                  const wayPointMarker = new google.maps.Marker({
-                    position,
-                    map: map.current!,
-                    icon: {
-                      path: google.maps.SymbolPath.CIRCLE,
-                      scale: markerSize,
-                      fillColor: markerColor,
-                      fillOpacity: 1,
-                      strokeColor: '#ffffff',
-                      strokeWeight: 2,
+                  // Calculate total distance
+                  result.routes[0].legs.forEach(leg => {
+                    if (leg.distance) {
+                      totalDistance += leg.distance.value; // meters
                     }
                   });
 
-                  const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                      <div class="p-2">
-                        <h4 class="font-semibold">${popupTitle}</h4>
-                        <p class="text-sm">${new Date(location.timestamp).toLocaleString()}</p>
-                        <p class="text-xs text-gray-500">Lat: ${location.latitude}, Lng: ${location.longitude}</p>
-                      </div>
-                    `
-                  });
+                  // Update trajectory info
+                  setTrajectoryInfo(prev => ({
+                    ...prev,
+                    [phoneId]: {
+                      distance: totalDistance / 1000, // convert to km
+                      duration: totalDuration,
+                      positions: filteredLocations.length
+                    }
+                  }));
 
-                  wayPointMarker.addListener('click', () => {
-                    infoWindow.open(map.current!, wayPointMarker);
-                  });
+                  // Add custom markers for start, end, and waypoints
+                  filteredLocations.forEach((location: any, index: number) => {
+                    const position = new google.maps.LatLng(
+                      parseFloat(location.latitude),
+                      parseFloat(location.longitude)
+                    );
+                    
+                    let markerColor = '#6b7280'; // gray for waypoints
+                    let markerSize = 6;
+                    let popupTitle = `Waypoint ${index + 1}`;
+                    
+                    if (index === 0) {
+                      markerColor = '#22c55e'; // green for start
+                      markerSize = 8;
+                      popupTitle = 'Start Point';
+                    } else if (index === filteredLocations.length - 1) {
+                      markerColor = '#ef4444'; // red for end
+                      markerSize = 8;
+                      popupTitle = 'End Point';
+                    }
+                    
+                    const wayPointMarker = new google.maps.Marker({
+                      position,
+                      map: map.current!,
+                      icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: markerSize,
+                        fillColor: markerColor,
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                      }
+                    });
 
-                  markersRef.current.push(wayPointMarker);
-                  bounds.extend(position);
+                    const infoWindow = new google.maps.InfoWindow({
+                      content: `
+                        <div class="p-2">
+                          <h4 class="font-semibold">${popupTitle}</h4>
+                          <p class="text-sm">${new Date(location.timestamp).toLocaleString()}</p>
+                          <p class="text-xs text-gray-500">Lat: ${location.latitude}, Lng: ${location.longitude}</p>
+                        </div>
+                      `
+                    });
+
+                    wayPointMarker.addListener('click', () => {
+                      infoWindow.open(map.current!, wayPointMarker);
+                    });
+
+                    markersRef.current.push(wayPointMarker);
+                    bounds.extend(position);
+                  });
+                } else {
+                  console.log('No route found, using polyline fallback');
+                  // Fallback to polyline if directions fail
+                  const path = filteredLocations.map((loc: any) => 
+                    new google.maps.LatLng(parseFloat(loc.latitude), parseFloat(loc.longitude))
+                  );
+                  
+                  const polyline = new google.maps.Polyline({
+                    path,
+                    geodesic: true,
+                    strokeColor: '#3b82f6',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 5,
+                  });
+                  
+                  polyline.setMap(map.current!);
+                  
+                  // Calculate approximate distance for polyline
+                  for (let i = 1; i < filteredLocations.length; i++) {
+                    const R = 6371;
+                    const dLat = (parseFloat(filteredLocations[i].latitude) - parseFloat(filteredLocations[i-1].latitude)) * Math.PI / 180;
+                    const dLon = (parseFloat(filteredLocations[i].longitude) - parseFloat(filteredLocations[i-1].longitude)) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                             Math.cos(parseFloat(filteredLocations[i-1].latitude) * Math.PI / 180) * Math.cos(parseFloat(filteredLocations[i].latitude) * Math.PI / 180) *
+                             Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    totalDistance += R * c * 1000; // convert to meters
+                  }
+
+                  setTrajectoryInfo(prev => ({
+                    ...prev,
+                    [phoneId]: {
+                      distance: totalDistance / 1000,
+                      duration: totalDuration,
+                      positions: filteredLocations.length
+                    }
+                  }));
+                }
+              } catch (error) {
+                console.error('Error calculating route:', error);
+                // Final fallback: draw simple polyline
+                const path = filteredLocations.map((loc: any) => 
+                  new google.maps.LatLng(parseFloat(loc.latitude), parseFloat(loc.longitude))
+                );
+                
+                const polyline = new google.maps.Polyline({
+                  path,
+                  geodesic: true,
+                  strokeColor: '#ff6b6b',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 5,
                 });
+                
+                polyline.setMap(map.current!);
               }
-            } catch (error) {
-              console.error('Error calculating route:', error);
-              // Fallback: draw simple polyline
-              const path = locations.map((loc: any) => 
-                new google.maps.LatLng(parseFloat(loc.latitude), parseFloat(loc.longitude))
-              );
-              
-              const polyline = new google.maps.Polyline({
-                path,
-                geodesic: true,
-                strokeColor: '#3b82f6',
-                strokeOpacity: 0.8,
-                strokeWeight: 5,
-              });
-              
-              polyline.setMap(map.current!);
             }
           }
         }
