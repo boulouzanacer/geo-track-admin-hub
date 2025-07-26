@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Clock } from 'lucide-react';
+import { MapPin, Navigation, Clock, Route } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -30,6 +30,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number}}>({});
   const [loading, setLoading] = useState(true);
+  const [trajectoryInfo, setTrajectoryInfo] = useState<{[phoneId: string]: {distance: number, duration: number, positions: number}}>({});
 
   // Get Mapbox token from Supabase secrets
   useEffect(() => {
@@ -236,6 +237,13 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
             const existingArrows = document.querySelectorAll('.tracking-arrow, .tracking-marker');
             existingArrows.forEach(arrow => arrow.remove());
             
+            // Calculate trajectory info
+            let totalDistance = 0;
+            let totalDuration = 0;
+            const startTime = new Date(locations[0].timestamp);
+            const endTime = new Date(locations[locations.length - 1].timestamp);
+            totalDuration = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // minutes
+            
             // Get route between consecutive points
             const routeSegments = [];
             for (let i = 0; i < locations.length - 1; i++) {
@@ -249,19 +257,40 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
                 
                 if (routeData.routes && routeData.routes.length > 0) {
                   const route = routeData.routes[0];
+                  totalDistance += route.distance; // meters
                   routeSegments.push(...route.geometry.coordinates);
                 } else {
                   // Fallback to straight line if no route found
+                  const distance = calculateDistance(
+                    parseFloat(start.latitude), parseFloat(start.longitude),
+                    parseFloat(end.latitude), parseFloat(end.longitude)
+                  );
+                  totalDistance += distance * 1000; // convert km to meters
                   routeSegments.push([parseFloat(start.longitude), parseFloat(start.latitude)]);
                   routeSegments.push([parseFloat(end.longitude), parseFloat(end.latitude)]);
                 }
               } catch (error) {
                 console.error('Error fetching route:', error);
                 // Fallback to straight line
+                const distance = calculateDistance(
+                  parseFloat(start.latitude), parseFloat(start.longitude),
+                  parseFloat(end.latitude), parseFloat(end.longitude)
+                );
+                totalDistance += distance * 1000; // convert km to meters
                 routeSegments.push([parseFloat(start.longitude), parseFloat(start.latitude)]);
                 routeSegments.push([parseFloat(end.longitude), parseFloat(end.latitude)]);
               }
             }
+            
+            // Update trajectory info
+            setTrajectoryInfo(prev => ({
+              ...prev,
+              [phoneId]: {
+                distance: totalDistance / 1000, // convert to km
+                duration: totalDuration,
+                positions: locations.length
+              }
+            }));
             
             // Add the complete route
             if (routeSegments.length > 1) {
@@ -392,6 +421,19 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
     return (bearing + 360) % 360;
   };
 
+  // Helper function to calculate distance between two coordinates (Haversine formula)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in kilometers
+  };
+
   if (!mapboxToken) {
     return (
       <Card className="h-full">
@@ -454,6 +496,56 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Trajectory Info Panel */}
+          {Object.keys(trajectoryInfo).length > 0 && (
+            <div className="mt-4 space-y-3">
+              {Object.entries(trajectoryInfo).map(([phoneId, info]) => {
+                const phone = phones.find(p => p.phone_id === phoneId);
+                return (
+                  <Card key={phoneId} className="bg-muted/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <Route className="h-4 w-4" />
+                        Trajectory: {phone?.name || phoneId}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Navigation className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Distance</span>
+                          </div>
+                          <p className="font-semibold text-primary">
+                            {info.distance.toFixed(2)} km
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Duration</span>
+                          </div>
+                          <p className="font-semibold text-primary">
+                            {Math.floor(info.duration / 60)}h {Math.round(info.duration % 60)}m
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <MapPin className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Points</span>
+                          </div>
+                          <p className="font-semibold text-primary">
+                            {info.positions}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
