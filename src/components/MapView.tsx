@@ -149,7 +149,16 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
 
   // Add phone markers to map
   useEffect(() => {
-    if (!map.current || Object.keys(phoneLocations).length === 0) return;
+    if (!map.current || Object.keys(phoneLocations).length === 0) {
+      console.log('Map not ready or no phone locations:', { 
+        mapReady: !!map.current, 
+        locationCount: Object.keys(phoneLocations).length,
+        phoneLocations 
+      });
+      return;
+    }
+
+    console.log('Adding markers for phones:', phones.length, 'with locations:', phoneLocations);
 
     // Clear existing markers
     const existingMarkers = document.querySelectorAll('.phone-marker');
@@ -160,9 +169,13 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
 
     phones.forEach(phone => {
       const location = phoneLocations[phone.phone_id];
+      console.log(`Processing phone ${phone.phone_id}:`, location);
+      
       if (location) {
         hasValidLocations = true;
         bounds.extend([location.lng, location.lat]);
+
+        console.log(`Creating marker for ${phone.name} at [${location.lng}, ${location.lat}]`);
 
         // Create marker element with car icon
         const el = document.createElement('div');
@@ -199,10 +212,14 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
         `);
 
         // Add marker to map
-        new mapboxgl.Marker(el)
+        const marker = new mapboxgl.Marker(el)
           .setLngLat([location.lng, location.lat])
           .setPopup(popup)
           .addTo(map.current!);
+          
+        console.log('Marker added successfully:', marker);
+      } else {
+        console.log(`No location found for phone ${phone.phone_id}`);
       }
     });
 
