@@ -21,9 +21,10 @@ interface Phone {
 interface MapViewProps {
   selectedPhone: Phone | null;
   phones: Phone[];
+  trackingData?: any;
 }
 
-const MapView = ({ selectedPhone, phones }: MapViewProps) => {
+const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
@@ -209,6 +210,67 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
       }
     });
 
+    // Add tracking lines for movement data
+    if (Object.keys(trackingData).length > 0) {
+      console.log('Adding tracking lines:', trackingData);
+      
+      Object.entries(trackingData).forEach(([phoneId, data]: [string, any]) => {
+        if (data.startLocation && data.endLocation) {
+          const startCoords = [parseFloat(data.startLocation.longitude), parseFloat(data.startLocation.latitude)];
+          const endCoords = [parseFloat(data.endLocation.longitude), parseFloat(data.endLocation.latitude)];
+          
+          // Create line element
+          const lineId = `tracking-line-${phoneId}`;
+          
+          if (map.current.getSource(lineId)) {
+            map.current.removeLayer(lineId);
+            map.current.removeSource(lineId);
+          }
+          
+          map.current.addSource(lineId, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: [startCoords, endCoords]
+              }
+            }
+          });
+          
+          map.current.addLayer({
+            id: lineId,
+            type: 'line',
+            source: lineId,
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#ff6b6b',
+              'line-width': 3
+            }
+          });
+          
+          // Add arrow at the end to show direction
+          const bearing = getBearing(startCoords, endCoords);
+          const arrowEl = document.createElement('div');
+          arrowEl.className = 'tracking-arrow';
+          arrowEl.style.width = '0';
+          arrowEl.style.height = '0';
+          arrowEl.style.borderLeft = '8px solid transparent';
+          arrowEl.style.borderRight = '8px solid transparent';
+          arrowEl.style.borderBottom = '12px solid #ff6b6b';
+          arrowEl.style.transform = `rotate(${bearing}deg)`;
+          
+          new mapboxgl.Marker(arrowEl)
+            .setLngLat(endCoords as [number, number])
+            .addTo(map.current!);
+        }
+      });
+    }
+
     // Fit map to show all markers or center on single location
     if (hasValidLocations) {
       if (phones.filter(phone => phoneLocations[phone.phone_id]).length === 1) {
@@ -221,7 +283,22 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
         map.current.fitBounds(bounds, { padding: 50, maxZoom: 10 });
       }
     }
-  }, [phoneLocations, phones, selectedPhone]);
+  }, [phoneLocations, phones, selectedPhone, trackingData]);
+
+  // Helper function to calculate bearing between two points
+  const getBearing = (start: number[], end: number[]) => {
+    const startLat = start[1] * Math.PI / 180;
+    const startLng = start[0] * Math.PI / 180;
+    const endLat = end[1] * Math.PI / 180;
+    const endLng = end[0] * Math.PI / 180;
+    
+    const dLng = endLng - startLng;
+    const y = Math.sin(dLng) * Math.cos(endLat);
+    const x = Math.cos(startLat) * Math.sin(endLat) - Math.sin(startLat) * Math.cos(endLat) * Math.cos(dLng);
+    
+    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360;
+  };
 
   if (!mapboxToken) {
     return (

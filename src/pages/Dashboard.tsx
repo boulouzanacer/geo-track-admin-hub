@@ -11,6 +11,7 @@ import PhoneList from '@/components/PhoneList';
 import { UserManagement } from '@/components/UserManagement';
 import { PhoneManagement } from '@/components/PhoneManagement';
 import { UserSelector } from '@/components/UserSelector';
+import { TrackingFilter } from '@/components/TrackingFilter';
 
 interface UserProfile {
   id: string;
@@ -37,6 +38,10 @@ const Dashboard = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [trackingDate, setTrackingDate] = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState<string>('08:00');
+  const [endTime, setEndTime] = useState<string>('18:00');
+  const [trackingData, setTrackingData] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,6 +121,67 @@ const Dashboard = () => {
     }
     
     setLoading(false);
+  };
+
+  const fetchTrackingData = async () => {
+    if (!trackingDate || !startTime || !endTime) return;
+    
+    setLoading(true);
+    try {
+      const tracking: any = {};
+      const targetPhones = selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones;
+      
+      for (const phone of targetPhones) {
+        // Create start and end datetime strings
+        const startDateTime = new Date(trackingDate);
+        const [startHours, startMinutes] = startTime.split(':');
+        startDateTime.setHours(parseInt(startHours), parseInt(startMinutes), 0, 0);
+        
+        const endDateTime = new Date(trackingDate);
+        const [endHours, endMinutes] = endTime.split(':');
+        endDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+        
+        try {
+          // Fetch locations in the time range
+          const { data, error } = await supabase
+            .from('locations')
+            .select('*')
+            .eq('phone_id', phone.id)
+            .gte('timestamp', startDateTime.toISOString())
+            .lte('timestamp', endDateTime.toISOString())
+            .order('timestamp');
+            
+          if (error) {
+            console.error(`Error fetching tracking data for phone ${phone.phone_id}:`, error);
+          } else if (data && data.length >= 2) {
+            tracking[phone.phone_id] = {
+              startLocation: data[0],
+              endLocation: data[data.length - 1],
+              allLocations: data
+            };
+          }
+        } catch (err) {
+          console.error(`Error fetching tracking data for phone ${phone.phone_id}:`, err);
+        }
+      }
+      
+      setTrackingData(tracking);
+    } catch (error) {
+      console.error('Error fetching tracking data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch tracking data",
+        variant: "destructive",
+      });
+    }
+    setLoading(false);
+  };
+
+  const clearTrackingFilter = () => {
+    setTrackingDate(null);
+    setStartTime('08:00');
+    setEndTime('18:00');
+    setTrackingData({});
   };
 
   const handleSignOut = async () => {
@@ -221,6 +287,21 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
+
+            {/* Tracking Filter */}
+            <div className="mb-4">
+              <TrackingFilter
+                selectedDate={trackingDate}
+                startTime={startTime}
+                endTime={endTime}
+                onDateChange={setTrackingDate}
+                onStartTimeChange={setStartTime}
+                onEndTimeChange={setEndTime}
+                onApplyFilter={fetchTrackingData}
+                onClearFilter={clearTrackingFilter}
+                isLoading={loading}
+              />
+            </div>
             
             {/* Main Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -242,6 +323,7 @@ const Dashboard = () => {
                 <MapView
                   selectedPhone={selectedPhone}
                   phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+                  trackingData={trackingData}
                 />
               </div>
             </div>
