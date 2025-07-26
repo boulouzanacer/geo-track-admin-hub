@@ -60,6 +60,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth error:', authError);
       throw new Error('Unauthorized');
     }
 
@@ -70,7 +71,13 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('auth_user_id', user.id)
       .single();
 
-    if (profileError || userProfile?.role !== 'admin') {
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      throw new Error('Failed to get user profile');
+    }
+
+    if (userProfile?.role !== 'admin') {
+      console.error('User role:', userProfile?.role, 'User ID:', user.id);
       throw new Error('Admin access required');
     }
 
