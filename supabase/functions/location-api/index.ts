@@ -13,9 +13,10 @@ interface LocationData {
   timestamp?: string;
 }
 
+// Create Supabase client with service role key to bypass RLS for API operations
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
 const handler = async (req: Request): Promise<Response> => {
