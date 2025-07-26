@@ -2,3 +2,6 @@ project_id = "ebwbrjkqrsgumlwvhrhb"
 
 [functions.location-api]
 verify_jwt = false
+
+[functions.admin-user-management]
+verify_jwt = false

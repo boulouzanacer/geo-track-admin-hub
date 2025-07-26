@@ -63,43 +63,36 @@ export const UserManagement = () => {
 
     try {
       if (editingUser) {
-        // Update existing user
-        const { error } = await supabase
-          .from('users')
-          .update({
+        // Update existing user via edge function
+        const { data, error } = await supabase.functions.invoke('admin-user-management?action=update', {
+          body: {
+            userId: editingUser.id,
             name: formData.name,
             email: formData.email,
             role: formData.role
-          })
-          .eq('id', editingUser.id);
+          }
+        });
 
         if (error) throw error;
+        if (data.error) throw new Error(data.error);
 
         toast({
           title: "Success",
           description: "User updated successfully!",
         });
       } else {
-        // Create new user in auth and users table
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: formData.email,
-          password: formData.password,
-          email_confirm: true
+        // Create new user via edge function
+        const { data, error } = await supabase.functions.invoke('admin-user-management?action=create', {
+          body: {
+            email: formData.email,
+            password: formData.password,
+            name: formData.name,
+            role: formData.role
+          }
         });
 
-        if (authError) throw authError;
-
-        // Add user to users table
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert({
-            auth_user_id: authData.user.id,
-            name: formData.name,
-            email: formData.email,
-            role: formData.role
-          });
-
-        if (insertError) throw insertError;
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
 
         toast({
           title: "Success",
@@ -125,19 +118,15 @@ export const UserManagement = () => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      // Delete from users table
-      const { error: deleteError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId);
+      const { data, error } = await supabase.functions.invoke('admin-user-management?action=delete', {
+        body: {
+          userId,
+          authUserId
+        }
+      });
 
-      if (deleteError) throw deleteError;
-
-      // Delete from auth if has auth_user_id
-      if (authUserId) {
-        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(authUserId);
-        if (authDeleteError) console.warn('Auth deletion failed:', authDeleteError);
-      }
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
       toast({
         title: "Success",
