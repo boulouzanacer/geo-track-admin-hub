@@ -9,6 +9,7 @@ import { MapPin, Users, Smartphone, LogOut } from 'lucide-react';
 import MapView from '@/components/MapView';
 import PhoneList from '@/components/PhoneList';
 import { UserManagement } from '@/components/UserManagement';
+import { PhoneManagement } from '@/components/PhoneManagement';
 
 interface UserProfile {
   id: string;
@@ -232,7 +233,10 @@ const Dashboard = () => {
           
           {userProfile.role === 'admin' && (
             <TabsContent value="users">
-              <UserManagement />
+              <div className="grid gap-6">
+                <UserManagement />
+                <PhoneManagement />
+              </div>
             </TabsContent>
           )}
         </Tabs>
