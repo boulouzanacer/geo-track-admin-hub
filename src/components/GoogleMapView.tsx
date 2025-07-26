@@ -132,7 +132,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
     const loader = new Loader({
       apiKey: googleMapsKey,
       version: 'weekly',
-      libraries: ['geometry', 'places']
+      libraries: ['geometry', 'places', 'routes']
     });
 
     loader.load().then(() => {
@@ -255,13 +255,21 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
             }));
 
             try {
+              console.log('Attempting to calculate route with:', {
+                origin: `${origin.lat()}, ${origin.lng()}`,
+                destination: `${destination.lat()}, ${destination.lng()}`,
+                waypointsCount: waypoints.length
+              });
+
               const result = await directionsService.route({
                 origin,
                 destination,
-                waypoints: waypoints.slice(0, 23), // Google Maps allows max 25 waypoints (23 + origin + destination)
+                waypoints: waypoints.slice(0, 8), // Reduce waypoints to avoid quota issues
                 travelMode: google.maps.TravelMode.DRIVING,
                 optimizeWaypoints: false
               });
+
+              console.log('Directions API result:', result);
 
               if (result.routes[0]) {
                 directionsRenderer.setDirections(result);
