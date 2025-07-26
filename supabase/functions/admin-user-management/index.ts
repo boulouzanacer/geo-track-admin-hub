@@ -69,15 +69,15 @@ const handler = async (req: Request): Promise<Response> => {
       .from('users')
       .select('role')
       .eq('auth_user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
       console.error('Profile error:', profileError);
       throw new Error('Failed to get user profile');
     }
 
-    if (userProfile?.role !== 'admin') {
-      console.error('User role:', userProfile?.role, 'User ID:', user.id);
+    if (!userProfile || userProfile.role !== 'admin') {
+      console.error('User profile:', userProfile, 'User ID:', user.id);
       throw new Error('Admin access required');
     }
 
