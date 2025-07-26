@@ -94,6 +94,39 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
     }
   }, [phones]);
 
+  // Real-time updates for new location data
+  useEffect(() => {
+    const channel = supabase
+      .channel('location-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'locations'
+        },
+        (payload) => {
+          console.log('New location received:', payload);
+          const newLocation = payload.new as any;
+          
+          if (newLocation.phone_id && newLocation.latitude && newLocation.longitude) {
+            setPhoneLocations(prev => ({
+              ...prev,
+              [newLocation.phone_id]: {
+                lat: parseFloat(newLocation.latitude),
+                lng: parseFloat(newLocation.longitude)
+              }
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || !mapboxToken) return;
