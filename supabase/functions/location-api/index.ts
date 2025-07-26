@@ -32,7 +32,8 @@ const handler = async (req: Request): Promise<Response> => {
     if (req.method === 'POST' && path.endsWith('/location-api')) {
       const { phone_id, latitude, longitude, timestamp }: LocationData = await req.json();
       
-      console.log('Received location data:', { phone_id, latitude, longitude, timestamp });
+      console.log('DEBUG: Received location data:', { phone_id, latitude, longitude, timestamp });
+      console.log('DEBUG: Looking for phone with phone_id:', phone_id);
 
       if (!phone_id || latitude === undefined || longitude === undefined) {
         return new Response(
@@ -45,12 +46,15 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       // Find the phone by phone_id
+      console.log('DEBUG: Querying phones table for phone_id:', phone_id);
       const { data: phone, error: phoneError } = await supabase
         .from('phones')
         .select('id')
         .eq('phone_id', phone_id)
         .maybeSingle();
 
+      console.log('DEBUG: Phone query result:', { phone, phoneError });
+      
       if (phoneError) {
         console.error('Database error finding phone:', phoneError);
         return new Response(
