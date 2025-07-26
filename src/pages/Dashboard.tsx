@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ interface Phone {
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [phones, setPhones] = useState<Phone[]>([]);
@@ -65,8 +67,8 @@ const Dashboard = () => {
       await createUserProfile();
     } else if (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch user profile",
+        title: t('auth.error'),
+        description: t('dashboard.errors.fetchProfile'),
         variant: "destructive",
       });
     } else {
@@ -90,8 +92,8 @@ const Dashboard = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to create user profile",
+        title: t('auth.error'),
+        description: t('dashboard.errors.createProfile'),
         variant: "destructive",
       });
     } else {
@@ -112,8 +114,8 @@ const Dashboard = () => {
 
     if (error) {
       toast({
-        title: "Error",
-        description: "Failed to fetch phones",
+        title: t('auth.error'),
+        description: t('dashboard.errors.fetchPhones'),
         variant: "destructive",
       });
     } else {
@@ -169,8 +171,8 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching tracking data:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch tracking data",
+        title: t('auth.error'),
+        description: t('dashboard.errors.fetchTracking'),
         variant: "destructive",
       });
     }
@@ -193,7 +195,7 @@ const Dashboard = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading profile...</p>
+          <p className="mt-4 text-muted-foreground">{t('dashboard.loadingProfile')}</p>
         </div>
       </div>
     );
@@ -206,15 +208,15 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <MapPin className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Geo Track Admin</h1>
+            <h1 className="text-xl font-semibold">{t('auth.title')}</h1>
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-muted-foreground">
-              Welcome, {userProfile.name} ({userProfile.role})
+              {t('dashboard.welcome')}, {userProfile.name} ({userProfile.role})
             </span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              {t('dashboard.signOut')}
             </Button>
           </div>
         </div>
@@ -226,7 +228,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Phones</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.totalPhones')}</CardTitle>
               <Smartphone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -236,7 +238,7 @@ const Dashboard = () => {
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.activeUsers')}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -248,7 +250,7 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Updates</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('dashboard.recentUpdates')}</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -267,9 +269,9 @@ const Dashboard = () => {
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="overview">{t('dashboard.overview')}</TabsTrigger>
             {userProfile.role === 'admin' && (
-              <TabsTrigger value="users">User Management</TabsTrigger>
+              <TabsTrigger value="users">{t('dashboard.userManagement')}</TabsTrigger>
             )}
           </TabsList>
           
@@ -278,7 +280,7 @@ const Dashboard = () => {
             {userProfile.role === 'admin' && (
               <div className="mb-4">
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">Filter by user:</span>
+                  <span className="text-sm font-medium">{t('dashboard.filterByUser')}</span>
                   <UserSelector
                     selectedUserId={selectedUserId}
                     onUserSelect={setSelectedUserId}
