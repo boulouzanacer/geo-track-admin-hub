@@ -10,7 +10,6 @@ interface LocationData {
   phone_id: string;
   latitude: number;
   longitude: number;
-  accuracy?: number;
   timestamp?: string;
 }
 
@@ -31,9 +30,9 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     // POST /location-api - Send location data from phone
     if (req.method === 'POST' && path.endsWith('/location-api')) {
-      const { phone_id, latitude, longitude, accuracy, timestamp }: LocationData = await req.json();
+      const { phone_id, latitude, longitude, timestamp }: LocationData = await req.json();
       
-      console.log('Received location data:', { phone_id, latitude, longitude, accuracy, timestamp });
+      console.log('Received location data:', { phone_id, latitude, longitude, timestamp });
 
       if (!phone_id || latitude === undefined || longitude === undefined) {
         return new Response(
@@ -70,7 +69,6 @@ const handler = async (req: Request): Promise<Response> => {
           phone_id: phone.id,
           latitude,
           longitude,
-          accuracy,
           timestamp: timestamp || new Date().toISOString()
         })
         .select()

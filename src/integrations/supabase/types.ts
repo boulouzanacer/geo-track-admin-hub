@@ -16,7 +16,6 @@ export type Database = {
     Tables: {
       locations: {
         Row: {
-          accuracy: number | null
           created_at: string
           id: string
           latitude: number
@@ -25,7 +24,6 @@ export type Database = {
           timestamp: string
         }
         Insert: {
-          accuracy?: number | null
           created_at?: string
           id?: string
           latitude: number
@@ -34,7 +32,6 @@ export type Database = {
           timestamp?: string
         }
         Update: {
-          accuracy?: number | null
           created_at?: string
           id?: string
           latitude?: number
