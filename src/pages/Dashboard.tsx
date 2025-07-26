@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { MapPin, Users, Smartphone, LogOut } from 'lucide-react';
-import MapView from '@/components/MapView';
+import GoogleMapView from '@/components/GoogleMapView';
 import PhoneList from '@/components/PhoneList';
 import { UserManagement } from '@/components/UserManagement';
 import { PhoneManagement } from '@/components/PhoneManagement';
@@ -320,7 +320,7 @@ const Dashboard = () => {
 
               {/* Map */}
               <div className="lg:col-span-3">
-                <MapView
+                <GoogleMapView
                   selectedPhone={selectedPhone}
                   phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
                   trackingData={trackingData}
