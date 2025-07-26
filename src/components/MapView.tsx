@@ -174,20 +174,19 @@ const MapView = ({ selectedPhone, phones }: MapViewProps) => {
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
         
-        // Create car icon SVG
-        const carIcon = `
+        // Create phone icon SVG
+        const phoneIcon = `
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5 17h2m10 0h2M7 17v4l-2-2v-2m8-2v4l2-2v-2m-6-15l1.5 7H7l1.5-7M6 8h12l1 4H5l1-4z" 
-                  stroke="${selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6'}" 
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" 
+                  stroke="white" 
                   stroke-width="2" 
                   stroke-linecap="round" 
                   stroke-linejoin="round" 
-                  fill="${selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6'}" 
-                  fill-opacity="0.8"/>
+                  fill="${selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6'}"/>
           </svg>
         `;
         
-        el.innerHTML = carIcon;
+        el.innerHTML = phoneIcon;
         el.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))';
 
         // Create popup
