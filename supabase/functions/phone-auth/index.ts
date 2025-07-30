@@ -31,7 +31,7 @@ serve(async (req) => {
     });
 
     if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      return new Response(JSON.stringify({ message: 'Method not allowed' }), {
         status: 405,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -40,7 +40,7 @@ serve(async (req) => {
     const { phone_id, email, password }: AuthRequest = await req.json();
 
     if (!phone_id || !email || !password) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      return new Response(JSON.stringify({ message: 'Missing required fields' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -56,10 +56,7 @@ serve(async (req) => {
 
     if (authError || !authData.user) {
       console.log(`DEBUG: Authentication failed - email: ${email}, error:`, authError);
-      return new Response(JSON.stringify({ 
-        error: 'Invalid credentials',
-        debug: 'Email or password is incorrect'
-      }), {
+      return new Response(JSON.stringify({ message: 'Invalid credentials' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -76,10 +73,7 @@ serve(async (req) => {
 
     if (userError || !userData) {
       console.log(`DEBUG: User profile not found - auth_user_id: ${authData.user.id}, error:`, userError);
-      return new Response(JSON.stringify({ 
-        error: 'User profile not found',
-        debug: 'User authenticated but profile missing'
-      }), {
+      return new Response(JSON.stringify({ message: 'User profile not found' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -119,7 +113,7 @@ serve(async (req) => {
 
       if (insertError) {
         console.error(`DEBUG: Error adding phone:`, insertError);
-        return new Response(JSON.stringify({ error: 'Failed to add phone' }), {
+        return new Response(JSON.stringify({ message: 'Failed to add phone' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -134,7 +128,7 @@ serve(async (req) => {
 
     if (phoneError) {
       console.error(`DEBUG: Error checking phone:`, phoneError);
-      return new Response(JSON.stringify({ error: 'Database error' }), {
+      return new Response(JSON.stringify({ message: 'Database error' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -143,7 +137,7 @@ serve(async (req) => {
     // Phone exists, check if it belongs to the user
     if (phoneData.user_id !== userData.id) {
       console.log(`DEBUG: Phone belongs to different user - phone_id: ${phone_id}, expected_user: ${userData.id}, actual_user: ${phoneData.user_id}`);
-      return new Response(JSON.stringify({ error: 'Phone belongs to another user' }), {
+      return new Response(JSON.stringify({ message: 'Phone belongs to another user' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -157,7 +151,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in phone-auth function:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ message: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
