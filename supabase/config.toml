@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.admin-user-management]
 verify_jwt = false
+
+[functions.phone-auth]
+verify_jwt = false
