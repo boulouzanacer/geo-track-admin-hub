@@ -281,9 +281,10 @@ const Dashboard = () => {
           </TabsList>
           
           <TabsContent value="overview">
-            {/* User Filter for Admins */}
-            {userProfile.role === 'admin' && (
-              <div className="mb-4">
+            {/* Filters */}
+            <div className="mb-4 space-y-4">
+              {/* User Filter for Admins */}
+              {userProfile.role === 'admin' && (
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium">{t('dashboard.filterByUser')}</span>
                   <UserSelector
@@ -291,33 +292,56 @@ const Dashboard = () => {
                     onUserSelect={setSelectedUserId}
                     disabled={loading}
                   />
+                  
+                  {/* Movement Tracking Filter inline */}
+                  <Collapsible open={isTrackingFilterOpen} onOpenChange={setIsTrackingFilterOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" className="flex items-center gap-2">
+                        Movement Tracking Filter
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isTrackingFilterOpen ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <TrackingFilter
+                        selectedDate={trackingDate}
+                        startTime={startTime}
+                        endTime={endTime}
+                        onDateChange={setTrackingDate}
+                        onStartTimeChange={setStartTime}
+                        onEndTimeChange={setEndTime}
+                        onApplyFilter={fetchTrackingData}
+                        onClearFilter={clearTrackingFilter}
+                        isLoading={loading}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
-              </div>
-            )}
-
-            {/* Tracking Filter */}
-            <div className="mb-4">
-              <Collapsible open={isTrackingFilterOpen} onOpenChange={setIsTrackingFilterOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2 mb-2">
-                    Movement Tracking Filter
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isTrackingFilterOpen ? 'rotate-180' : ''}`} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <TrackingFilter
-                    selectedDate={trackingDate}
-                    startTime={startTime}
-                    endTime={endTime}
-                    onDateChange={setTrackingDate}
-                    onStartTimeChange={setStartTime}
-                    onEndTimeChange={setEndTime}
-                    onApplyFilter={fetchTrackingData}
-                    onClearFilter={clearTrackingFilter}
-                    isLoading={loading}
-                  />
-                </CollapsibleContent>
-              </Collapsible>
+              )}
+              
+              {/* Movement Tracking Filter for non-admins */}
+              {userProfile.role !== 'admin' && (
+                <Collapsible open={isTrackingFilterOpen} onOpenChange={setIsTrackingFilterOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      Movement Tracking Filter
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isTrackingFilterOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <TrackingFilter
+                      selectedDate={trackingDate}
+                      startTime={startTime}
+                      endTime={endTime}
+                      onDateChange={setTrackingDate}
+                      onStartTimeChange={setStartTime}
+                      onEndTimeChange={setEndTime}
+                      onApplyFilter={fetchTrackingData}
+                      onClearFilter={clearTrackingFilter}
+                      isLoading={loading}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
             
             {/* Main Layout */}
