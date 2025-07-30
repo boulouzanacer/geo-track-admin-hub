@@ -11,13 +11,19 @@ interface CreateUserRequest {
   password: string;
   name: string;
   role: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  enabled?: boolean;
 }
 
 interface UpdateUserRequest {
   userId: string;
-  name: string;
-  email: string;
-  role: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  enabled?: boolean;
 }
 
 interface DeleteUserRequest {
@@ -86,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     switch (action) {
       case 'create': {
-        const { email, password, name, role }: CreateUserRequest = await req.json();
+        const { email, password, name, role, start_time, end_time, enabled = true }: CreateUserRequest = await req.json();
 
         // Create user in auth
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -107,6 +113,9 @@ const handler = async (req: Request): Promise<Response> => {
             name,
             email,
             role,
+            start_time: start_time || null,
+            end_time: end_time || null,
+            enabled,
           })
           .select()
           .single();
@@ -124,11 +133,19 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       case 'update': {
-        const { userId, name, email, role }: UpdateUserRequest = await req.json();
+        const { userId, name, email, role, start_time, end_time, enabled }: UpdateUserRequest = await req.json();
+
+        const updateData: any = {};
+        if (name !== undefined) updateData.name = name;
+        if (email !== undefined) updateData.email = email;
+        if (role !== undefined) updateData.role = role;
+        if (start_time !== undefined) updateData.start_time = start_time;
+        if (end_time !== undefined) updateData.end_time = end_time;
+        if (enabled !== undefined) updateData.enabled = enabled;
 
         const { error } = await supabaseAdmin
           .from('users')
-          .update({ name, email, role })
+          .update(updateData)
           .eq('id', userId);
 
         if (error) {

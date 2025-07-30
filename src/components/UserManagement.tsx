@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, UserPlus, Edit } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface User {
   id: string;
@@ -17,6 +18,9 @@ interface User {
   role: string;
   created_at: string;
   auth_user_id?: string;
+  start_time?: string;
+  end_time?: string;
+  enabled?: boolean;
 }
 
 export const UserManagement = () => {
@@ -30,7 +34,10 @@ export const UserManagement = () => {
     name: '',
     email: '',
     role: 'user',
-    password: ''
+    password: '',
+    start_time: '',
+    end_time: '',
+    enabled: true
   });
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -72,7 +79,10 @@ export const UserManagement = () => {
             userId: editingUser.id,
             name: formData.name,
             email: formData.email,
-            role: formData.role
+            role: formData.role,
+            start_time: formData.start_time || null,
+            end_time: formData.end_time || null,
+            enabled: formData.enabled
           }
         });
 
@@ -90,7 +100,10 @@ export const UserManagement = () => {
             email: formData.email,
             password: formData.password,
             name: formData.name,
-            role: formData.role
+            role: formData.role,
+            start_time: formData.start_time || null,
+            end_time: formData.end_time || null,
+            enabled: formData.enabled
           }
         });
 
@@ -151,7 +164,10 @@ export const UserManagement = () => {
       name: '',
       email: '',
       role: 'user',
-      password: ''
+      password: '',
+      start_time: '',
+      end_time: '',
+      enabled: true
     });
     setEditingUser(null);
   };
@@ -162,7 +178,10 @@ export const UserManagement = () => {
       name: user.name,
       email: user.email,
       role: user.role,
-      password: ''
+      password: '',
+      start_time: user.start_time ? new Date(user.start_time).toISOString().slice(0, 16) : '',
+      end_time: user.end_time ? new Date(user.end_time).toISOString().slice(0, 16) : '',
+      enabled: user.enabled || true
     });
     setIsDialogOpen(true);
   };
@@ -270,6 +289,32 @@ export const UserManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="start_time">Start Time</Label>
+                  <Input
+                    id="start_time"
+                    type="datetime-local"
+                    value={formData.start_time}
+                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_time">End Time</Label>
+                  <Input
+                    id="end_time"
+                    type="datetime-local"
+                    value={formData.end_time}
+                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enabled"
+                    checked={formData.enabled}
+                    onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
+                  />
+                  <Label htmlFor="enabled">User Enabled</Label>
+                </div>
                 <div className="flex justify-end space-x-2">
                   <Button
                     type="button"
@@ -303,11 +348,30 @@ export const UserManagement = () => {
               className="flex items-center justify-between p-4 border rounded-lg"
             >
               <div>
-                <h4 className="font-medium">{user.name}</h4>
-                 <p className="text-sm text-muted-foreground">{user.email}</p>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium">{user.name}</h4>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    user.enabled !== false
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {user.enabled !== false ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
                 <p className="text-xs text-muted-foreground">
                   Created: {new Date(user.created_at).toLocaleDateString()}
                 </p>
+                {user.start_time && (
+                  <p className="text-xs text-muted-foreground">
+                    Start: {new Date(user.start_time).toLocaleString()}
+                  </p>
+                )}
+                {user.end_time && (
+                  <p className="text-xs text-muted-foreground">
+                    End: {new Date(user.end_time).toLocaleString()}
+                  </p>
+                )}
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                   user.role === 'admin' 
                     ? 'bg-primary/10 text-primary' 

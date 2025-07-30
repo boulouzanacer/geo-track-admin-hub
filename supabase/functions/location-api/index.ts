@@ -46,11 +46,19 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
 
-      // Find the phone by phone_id
+      // Find the phone and check if user is active
       console.log('DEBUG: Querying phones table for phone_id:', phone_id);
       const { data: phone, error: phoneError } = await supabase
         .from('phones')
-        .select('id')
+        .select(`
+          id,
+          users!inner(
+            id,
+            enabled,
+            start_time,
+            end_time
+          )
+        `)
         .eq('phone_id', phone_id)
         .maybeSingle();
 
@@ -73,6 +81,43 @@ const handler = async (req: Request): Promise<Response> => {
           JSON.stringify({ error: 'Phone not found' }),
           {
             status: 404,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
+      }
+
+      // Check if user is enabled and within time range
+      const user = phone.users;
+      const now = new Date();
+      
+      if (!user.enabled) {
+        console.log('User is disabled, rejecting location data');
+        return new Response(
+          JSON.stringify({ error: 'User is disabled' }),
+          {
+            status: 403,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
+      }
+
+      if (user.start_time && new Date(user.start_time) > now) {
+        console.log('User not yet active, rejecting location data');
+        return new Response(
+          JSON.stringify({ error: 'User not yet active' }),
+          {
+            status: 403,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
+      }
+
+      if (user.end_time && new Date(user.end_time) < now) {
+        console.log('User expired, rejecting location data');
+        return new Response(
+          JSON.stringify({ error: 'User expired' }),
+          {
+            status: 403,
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
           }
         );
