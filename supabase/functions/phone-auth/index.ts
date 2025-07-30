@@ -56,8 +56,11 @@ serve(async (req) => {
       .single();
 
     if (userError || !userData) {
-      console.log(`DEBUG: User not found - username: ${username}`);
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+      console.log(`DEBUG: User not found - username: ${username}, error:`, userError);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid credentials',
+        debug: `User '${username}' not found` 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -65,11 +68,14 @@ serve(async (req) => {
 
     console.log(`DEBUG: User found - id: ${userData.id}, enabled: ${userData.enabled}`);
 
-    // For this example, we'll use a simple password check
+    // For this example, we'll accept either "defaultpassword" or the user's name as password
     // In production, you should use proper password hashing
-    if (password !== 'defaultpassword') {
-      console.log(`DEBUG: Invalid password for user: ${username}`);
-      return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+    if (password !== 'defaultpassword' && password !== userData.name.toLowerCase()) {
+      console.log(`DEBUG: Invalid password for user: ${username}, tried: ${password}`);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid credentials',
+        debug: `Invalid password. Try 'defaultpassword' or '${userData.name.toLowerCase()}'`
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
