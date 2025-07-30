@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface AuthRequest {
   phone_id: string;
-  username: string;
+  email: string;  // Changed from username to email
   password: string;
 }
 
@@ -37,29 +37,29 @@ serve(async (req) => {
       });
     }
 
-    const { phone_id, username, password }: AuthRequest = await req.json();
+    const { phone_id, email, password }: AuthRequest = await req.json();
 
-    if (!phone_id || !username || !password) {
+    if (!phone_id || !email || !password) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`DEBUG: Phone auth request - phone_id: ${phone_id}, username: ${username}`);
+    console.log(`DEBUG: Phone auth request - phone_id: ${phone_id}, email: ${email}`);
 
     // Check if user exists and get their details
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, name, email, enabled, auth_user_id')
-      .eq('name', username)
+      .eq('email', email)
       .single();
 
     if (userError || !userData) {
-      console.log(`DEBUG: User not found - username: ${username}, error:`, userError);
+      console.log(`DEBUG: User not found - email: ${email}, error:`, userError);
       return new Response(JSON.stringify({ 
         error: 'Invalid credentials',
-        debug: `User '${username}' not found` 
+        debug: `User with email '${email}' not found` 
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -71,7 +71,7 @@ serve(async (req) => {
     // For this example, we'll accept either "defaultpassword" or the user's name as password
     // In production, you should use proper password hashing
     if (password !== 'defaultpassword' && password !== userData.name.toLowerCase()) {
-      console.log(`DEBUG: Invalid password for user: ${username}, tried: ${password}`);
+      console.log(`DEBUG: Invalid password for user: ${email}, tried: ${password}`);
       return new Response(JSON.stringify({ 
         error: 'Invalid credentials',
         debug: `Invalid password. Try 'defaultpassword' or '${userData.name.toLowerCase()}'`
@@ -83,7 +83,7 @@ serve(async (req) => {
 
     // Check if user is enabled
     if (!userData.enabled) {
-      console.log(`DEBUG: User disabled - username: ${username}`);
+      console.log(`DEBUG: User disabled - email: ${email}`);
       return new Response(JSON.stringify({ message: 'account disabled' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -143,7 +143,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`DEBUG: User authenticated and phone verified - phone_id: ${phone_id}, user: ${username}`);
+    console.log(`DEBUG: User authenticated and phone verified - phone_id: ${phone_id}, email: ${email}`);
     return new Response(JSON.stringify({ message: 'connected' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
