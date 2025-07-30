@@ -21,9 +21,11 @@ interface User {
 
 export const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -46,6 +48,7 @@ export const UserManagement = () => {
 
       if (error) throw error;
       setUsers(data || []);
+      setFilteredUsers(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -169,6 +172,23 @@ export const UserManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (!term.trim()) {
+      setFilteredUsers(users);
+    } else {
+      const filtered = users.filter(user => 
+        user.name.toLowerCase().includes(term.toLowerCase()) ||
+        user.email.toLowerCase().includes(term.toLowerCase())
+      );
+      setFilteredUsers(filtered);
+    }
+  };
+
+  useEffect(() => {
+    handleSearch(searchTerm);
+  }, [users]);
+
   if (loading && users.length === 0) {
     return <div className="p-4">Loading users...</div>;
   }
@@ -269,14 +289,25 @@ export const UserManagement = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {users.map((user) => (
+          <div className="mb-4">
+            <Input
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
+          {filteredUsers.map((user) => (
             <div
               key={user.id}
               className="flex items-center justify-between p-4 border rounded-lg"
             >
               <div>
                 <h4 className="font-medium">{user.name}</h4>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+                 <p className="text-sm text-muted-foreground">{user.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  Created: {new Date(user.created_at).toLocaleDateString()}
+                </p>
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                   user.role === 'admin' 
                     ? 'bg-primary/10 text-primary' 
@@ -305,6 +336,11 @@ export const UserManagement = () => {
               </div>
             </div>
           ))}
+          {filteredUsers.length === 0 && users.length > 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No users match your search criteria.
+            </p>
+          )}
           {users.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
               No users found. Add your first user to get started.

@@ -15,6 +15,7 @@ interface Phone {
   name: string;
   user_id: string;
   last_update: string;
+  created_at: string;
   users?: {
     name: string;
   };
@@ -28,9 +29,11 @@ interface User {
 
 export const PhoneManagement = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
+  const [filteredPhones, setFilteredPhones] = useState<Phone[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     phone_id: '',
     name: '',
@@ -52,6 +55,7 @@ export const PhoneManagement = () => {
 
       if (error) throw error;
       setPhones(data || []);
+      setFilteredPhones(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -154,6 +158,24 @@ export const PhoneManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (!term.trim()) {
+      setFilteredPhones(phones);
+    } else {
+      const filtered = phones.filter(phone => 
+        phone.name.toLowerCase().includes(term.toLowerCase()) ||
+        phone.phone_id.toLowerCase().includes(term.toLowerCase()) ||
+        phone.users?.name.toLowerCase().includes(term.toLowerCase())
+      );
+      setFilteredPhones(filtered);
+    }
+  };
+
+  useEffect(() => {
+    handleSearch(searchTerm);
+  }, [phones]);
+
   if (loading && phones.length === 0) {
     return <div className="p-4">Loading phones...</div>;
   }
@@ -240,7 +262,15 @@ export const PhoneManagement = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {phones.map((phone) => (
+          <div className="mb-4">
+            <Input
+              placeholder="Search by name, phone ID, or owner..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
+          {filteredPhones.map((phone) => (
             <div
               key={phone.id}
               className="flex items-center justify-between p-4 border rounded-lg"
@@ -251,6 +281,9 @@ export const PhoneManagement = () => {
                   <h4 className="font-medium">{phone.name}</h4>
                   <p className="text-sm text-muted-foreground">
                     ID: {phone.phone_id} • Owner: {phone.users?.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Created: {new Date(phone.created_at).toLocaleDateString()}
                   </p>
                   {phone.last_update && (
                     <p className="text-xs text-muted-foreground">
@@ -268,6 +301,11 @@ export const PhoneManagement = () => {
               </Button>
             </div>
           ))}
+          {filteredPhones.length === 0 && phones.length > 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No phones match your search criteria.
+            </p>
+          )}
           {phones.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
               No phones found. Add your first phone to get started.
