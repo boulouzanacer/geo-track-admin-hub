@@ -10,6 +10,7 @@ interface AuthRequest {
   phone_id: string;
   email: string;  // Changed from username to email
   password: string;
+  device_name: string;
 }
 
 serve(async (req) => {
@@ -37,9 +38,9 @@ serve(async (req) => {
       });
     }
 
-    const { phone_id, email, password }: AuthRequest = await req.json();
+    const { phone_id, email, password, device_name }: AuthRequest = await req.json();
 
-    if (!phone_id || !email || !password) {
+    if (!phone_id || !email || !password || !device_name) {
       return new Response(JSON.stringify({ message: 'Missing required fields' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -105,7 +106,7 @@ serve(async (req) => {
         .from('phones')
         .insert({
           phone_id: phone_id,
-          name: `Phone ${phone_id}`,
+          name: device_name,
           user_id: userData.id
         })
         .select()
