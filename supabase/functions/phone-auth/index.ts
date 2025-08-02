@@ -20,11 +20,19 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
+    // Initialize Supabase client for user authentication
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabaseAuth = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    // Separate admin client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -50,7 +58,7 @@ serve(async (req) => {
     console.log(`DEBUG: Phone auth request - phone_id: ${phone_id}, email: ${email}`);
 
     // First, verify the user's credentials using Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabaseAuth.auth.signInWithPassword({
       email: email,
       password: password,
     });
@@ -65,8 +73,8 @@ serve(async (req) => {
 
     console.log(`DEBUG: User authenticated via Supabase Auth - email: ${email}, user_id: ${authData.user.id}`);
 
-    // Now get the user's profile from our users table
-    const { data: userData, error: userError } = await supabase
+    // Now get the user's profile from our users table using admin client
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .select('id, name, email, enabled, auth_user_id')
       .eq('auth_user_id', authData.user.id)
@@ -91,18 +99,18 @@ serve(async (req) => {
       });
     }
 
-    // Check if phone exists
-    const { data: phoneData, error: phoneError } = await supabase
+    // Check if phone exists using admin client
+    const { data: phoneData, error: phoneError } = await supabaseAdmin
       .from('phones')
       .select('id, phone_id, user_id')
       .eq('phone_id', phone_id)
       .single();
 
     if (phoneError && phoneError.code === 'PGRST116') {
-      // Phone doesn't exist, add it to the user
+      // Phone doesn't exist, add it to the user using admin client
       console.log(`DEBUG: Phone not found, adding new phone - phone_id: ${phone_id}`);
       
-      const { data: newPhone, error: insertError } = await supabase
+      const { data: newPhone, error: insertError } = await supabaseAdmin
         .from('phones')
         .insert({
           phone_id: phone_id,
