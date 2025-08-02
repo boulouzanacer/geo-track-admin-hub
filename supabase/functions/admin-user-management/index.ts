@@ -47,6 +47,14 @@ const handler = async (req: Request): Promise<Response> => {
           autoRefreshToken: false,
           persistSession: false,
         },
+        db: {
+          schema: 'public',
+        },
+        global: {
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+        },
       }
     );
 
