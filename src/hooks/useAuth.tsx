@@ -75,7 +75,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear local state first
+      setUser(null);
+      setSession(null);
+      
+      // Then attempt to sign out from Supabase
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Even if the server signout fails, we've cleared local state
+      console.log('Signout completed locally');
+    }
   };
 
   const value = {
