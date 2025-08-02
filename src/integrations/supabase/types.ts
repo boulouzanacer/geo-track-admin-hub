@@ -92,27 +92,36 @@ export type Database = {
           auth_user_id: string | null
           created_at: string
           email: string
+          enabled: boolean | null
+          end_time: string | null
           id: string
           name: string
           role: string
+          start_time: string | null
           updated_at: string
         }
         Insert: {
           auth_user_id?: string | null
           created_at?: string
           email: string
+          enabled?: boolean | null
+          end_time?: string | null
           id?: string
           name: string
           role?: string
+          start_time?: string | null
           updated_at?: string
         }
         Update: {
           auth_user_id?: string | null
           created_at?: string
           email?: string
+          enabled?: boolean | null
+          end_time?: string | null
           id?: string
           name?: string
           role?: string
+          start_time?: string | null
           updated_at?: string
         }
         Relationships: []
