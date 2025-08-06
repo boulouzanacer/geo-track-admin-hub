@@ -102,6 +102,23 @@ const handler = async (req: Request): Promise<Response> => {
       case 'create': {
         const { email, password, name, role, start_time, end_time, enabled = true }: CreateUserRequest = await req.json();
 
+        // Check if email already exists in users table
+        const { data: existingUser } = await supabaseAdmin
+          .from('users')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (existingUser) {
+          return new Response(
+            JSON.stringify({ error: 'A user with this email already exists' }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
+        }
+
         // Create user in auth
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email,
@@ -110,7 +127,13 @@ const handler = async (req: Request): Promise<Response> => {
         });
 
         if (authError) {
-          throw new Error(`Failed to create auth user: ${authError.message}`);
+          return new Response(
+            JSON.stringify({ error: `Failed to create auth user: ${authError.message}` }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
         }
 
         // Add user to users table
@@ -131,7 +154,13 @@ const handler = async (req: Request): Promise<Response> => {
         if (userError) {
           // If user table insert fails, clean up auth user
           await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-          throw new Error(`Failed to create user profile: ${userError.message}`);
+          return new Response(
+            JSON.stringify({ error: `Failed to create user profile: ${userError.message}` }),
+            {
+              status: 500,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
         }
 
         return new Response(JSON.stringify({ success: true, user: userData }), {
