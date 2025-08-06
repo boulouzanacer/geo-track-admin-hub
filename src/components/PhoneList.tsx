@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Smartphone, Clock, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { UserPhoneActions } from './UserPhoneActions';
 
 interface Phone {
   id: string;
@@ -106,7 +107,15 @@ const PhoneList = ({
                     <h4 className="font-medium text-sm">{phone.name}</h4>
                     <p className="text-xs text-muted-foreground">{phone.phone_id}</p>
                   </div>
-                  <div className={`w-2 h-2 rounded-full ${getStatusColor(phone.last_update)}`} />
+                  <div className="flex items-center gap-2">
+                    {userRole !== 'admin' && (
+                      <UserPhoneActions 
+                        phone={phone} 
+                        onUpdate={onRefresh}
+                      />
+                    )}
+                    <div className={`w-2 h-2 rounded-full ${getStatusColor(phone.last_update)}`} />
+                  </div>
                 </div>
                 
                 {userRole === 'admin' && phone.users && (
