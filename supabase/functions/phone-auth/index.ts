@@ -93,8 +93,8 @@ serve(async (req) => {
     // Check if user is enabled
     if (!userData.enabled) {
       console.log(`DEBUG: User disabled - email: ${email}`);
-      return new Response(JSON.stringify({ message: 'account disabled' }), {
-        status: 200,
+      return new Response(JSON.stringify({ message: 'Account disabled' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
