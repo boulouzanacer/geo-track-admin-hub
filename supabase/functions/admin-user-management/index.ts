@@ -126,7 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
       case 'create': {
         const { email, password, name, role, start_time, end_time, enabled = true }: CreateUserRequest = await req.json();
 
-        // Check if email already exists in users table
+        // Check if email already exists in users table OR auth
         const { data: existingUser } = await supabaseAdmin
           .from('users')
           .select('email')
@@ -136,6 +136,20 @@ const handler = async (req: Request): Promise<Response> => {
         if (existingUser) {
           return new Response(
             JSON.stringify({ error: 'A user with this email already exists' }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
+        }
+
+        // Also check if user exists in auth
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+        const existingAuthUser = authUsers.users?.find(u => u.email === email);
+        
+        if (existingAuthUser) {
+          return new Response(
+            JSON.stringify({ error: 'A user with this email already exists in authentication' }),
             {
               status: 400,
               headers: { 'Content-Type': 'application/json', ...corsHeaders },
