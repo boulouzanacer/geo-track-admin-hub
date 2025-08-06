@@ -124,87 +124,72 @@ const handler = async (req: Request): Promise<Response> => {
 
     switch (action) {
       case 'create': {
-        const { email, password, name, role, start_time, end_time, enabled = true }: CreateUserRequest = await req.json();
+        try {
+          const { email, password, name, role, start_time, end_time, enabled = true }: CreateUserRequest = await req.json();
 
-        // Check if email already exists in users table OR auth
-        const { data: existingUser } = await supabaseAdmin
-          .from('users')
-          .select('email')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (existingUser) {
-          return new Response(
-            JSON.stringify({ error: 'A user with this email already exists' }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            }
-          );
-        }
-
-        // Also check if user exists in auth
-        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-        const existingAuthUser = authUsers.users?.find(u => u.email === email);
-        
-        if (existingAuthUser) {
-          return new Response(
-            JSON.stringify({ error: 'A user with this email already exists in authentication' }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            }
-          );
-        }
-
-        // Create user in auth
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-        });
-
-        if (authError) {
-          return new Response(
-            JSON.stringify({ error: `Failed to create auth user: ${authError.message}` }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            }
-          );
-        }
-
-        // Add user to users table
-        const { data: userData, error: userError } = await supabaseAdmin
-          .from('users')
-          .insert({
-            auth_user_id: authData.user.id,
-            name,
+          // Create user in auth first
+          const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
-            role,
-            start_time: start_time || null,
-            end_time: end_time || null,
-            enabled,
-          })
-          .select()
-          .single();
+            password,
+            email_confirm: true,
+          });
 
-        if (userError) {
-          // If user table insert fails, clean up auth user
-          await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+          if (authError) {
+            console.error('Auth creation error:', authError);
+            return new Response(
+              JSON.stringify({ error: `Failed to create auth user: ${authError.message}` }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+              }
+            );
+          }
+
+          // Add user to users table with upsert to handle duplicates
+          const { data: userData, error: userError } = await supabaseAdmin
+            .from('users')
+            .upsert({
+              auth_user_id: authData.user.id,
+              name,
+              email,
+              role,
+              start_time: start_time || null,
+              end_time: end_time || null,
+              enabled,
+            }, {
+              onConflict: 'email',
+              ignoreDuplicates: false
+            })
+            .select()
+            .single();
+
+          if (userError) {
+            console.error('User table error:', userError);
+            // If user table insert fails, clean up auth user
+            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+            return new Response(
+              JSON.stringify({ error: `Failed to create user profile: ${userError.message}` }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+              }
+            );
+          }
+
+          return new Response(JSON.stringify({ success: true, user: userData }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          });
+        } catch (error: any) {
+          console.error('Create user error:', error);
           return new Response(
-            JSON.stringify({ error: `Failed to create user profile: ${userError.message}` }),
+            JSON.stringify({ error: error.message }),
             {
               status: 500,
               headers: { 'Content-Type': 'application/json', ...corsHeaders },
             }
           );
         }
-
-        return new Response(JSON.stringify({ success: true, user: userData }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
       }
 
       case 'update': {
