@@ -67,7 +67,13 @@ const handler = async (req: Request): Promise<Response> => {
     // Get the user from the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      return new Response(
+        JSON.stringify({ error: 'No authorization header' }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -75,7 +81,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (authError || !user) {
       console.error('Auth error:', authError);
-      throw new Error('Unauthorized');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
 
     // Check if user is admin using admin client
@@ -87,12 +99,24 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (profileError) {
       console.error('Profile error:', profileError);
-      throw new Error('Failed to get user profile');
+      return new Response(
+        JSON.stringify({ error: 'Failed to get user profile' }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
 
     if (!userProfile || userProfile.role !== 'admin') {
       console.error('User profile:', userProfile, 'User ID:', user.id);
-      throw new Error('Admin access required');
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
     }
 
     const url = new URL(req.url);
@@ -186,7 +210,13 @@ const handler = async (req: Request): Promise<Response> => {
           .eq('id', userId);
 
         if (error) {
-          throw new Error(`Failed to update user: ${error.message}`);
+          return new Response(
+            JSON.stringify({ error: `Failed to update user: ${error.message}` }),
+            {
+              status: 500,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
         }
 
         return new Response(JSON.stringify({ success: true }), {
@@ -205,7 +235,13 @@ const handler = async (req: Request): Promise<Response> => {
           .eq('id', userId);
 
         if (deleteError) {
-          throw new Error(`Failed to delete user: ${deleteError.message}`);
+          return new Response(
+            JSON.stringify({ error: `Failed to delete user: ${deleteError.message}` }),
+            {
+              status: 500,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            }
+          );
         }
 
         // Delete from auth if has auth_user_id
@@ -223,7 +259,13 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       default:
-        throw new Error('Invalid action');
+        return new Response(
+          JSON.stringify({ error: 'Invalid action' }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          }
+        );
     }
 
   } catch (error: any) {
