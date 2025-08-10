@@ -184,12 +184,13 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
           map: map.current!,
           title: phone.name,
           icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
+            path: "M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13C19,5.13 15.87,2 12,2zM12,11.5c-1.38,0 -2.5,-1.12 -2.5,-2.5s1.12,-2.5 2.5,-2.5s2.5,1.12 2.5,2.5S13.38,11.5 12,11.5z",
             fillColor: selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6',
             fillOpacity: 1,
             strokeColor: '#ffffff',
             strokeWeight: 2,
+            scale: 1.5,
+            anchor: new google.maps.Point(12, 24),
           }
         });
 
