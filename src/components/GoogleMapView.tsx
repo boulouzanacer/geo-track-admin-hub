@@ -256,33 +256,67 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
                 const endTime = new Date(filteredLocations[filteredLocations.length - 1].timestamp);
                 const totalDuration = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // minutes
 
-                // Create polyline that connects all waypoints in sequence
-                const path = filteredLocations.map((loc: any) => 
-                  new google.maps.LatLng(parseFloat(loc.latitude), parseFloat(loc.longitude))
-                );
+                // Create routes between each pair of consecutive points
+                const directionsService = new google.maps.DirectionsService();
                 
-                const polyline = new google.maps.Polyline({
-                  path,
-                  geodesic: true,
-                  strokeColor: '#3b82f6',
-                  strokeOpacity: 0.8,
-                  strokeWeight: 4,
-                  icons: [{
-                    icon: {
-                      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                      scale: 3,
-                      fillColor: '#3b82f6',
-                      fillOpacity: 1,
-                      strokeColor: '#ffffff',
-                      strokeWeight: 1
-                    },
-                    offset: '100%',
-                    repeat: '200px'
-                  }]
-                });
-                
-                polyline.setMap(map.current!);
-                polylinesRef.current.push(polyline);
+                for (let i = 0; i < filteredLocations.length - 1; i++) {
+                  const start = new google.maps.LatLng(
+                    parseFloat(filteredLocations[i].latitude), 
+                    parseFloat(filteredLocations[i].longitude)
+                  );
+                  const end = new google.maps.LatLng(
+                    parseFloat(filteredLocations[i + 1].latitude), 
+                    parseFloat(filteredLocations[i + 1].longitude)
+                  );
+
+                  try {
+                    const result = await directionsService.route({
+                      origin: start,
+                      destination: end,
+                      travelMode: google.maps.TravelMode.DRIVING,
+                      avoidHighways: false,
+                      avoidTolls: false
+                    });
+
+                    const directionsRenderer = new google.maps.DirectionsRenderer({
+                      map: map.current!,
+                      directions: result,
+                      suppressMarkers: true, // We'll use our own markers
+                      polylineOptions: {
+                        strokeColor: '#3b82f6',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 4,
+                        icons: [{
+                          icon: {
+                            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                            scale: 3,
+                            fillColor: '#3b82f6',
+                            fillOpacity: 1,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 1
+                          },
+                          offset: '100%',
+                          repeat: '200px'
+                        }]
+                      }
+                    });
+
+                    routesRef.current.push(directionsRenderer);
+                  } catch (error) {
+                    console.log(`Could not get route between points ${i} and ${i+1}, using straight line`);
+                    // Fallback to straight line if routing fails
+                    const polyline = new google.maps.Polyline({
+                      path: [start, end],
+                      geodesic: true,
+                      strokeColor: '#ff6b6b',
+                      strokeOpacity: 0.6,
+                      strokeWeight: 3,
+                    });
+                    
+                    polyline.setMap(map.current!);
+                    polylinesRef.current.push(polyline);
+                  }
+                }
                 
                 // Calculate total distance using Haversine formula
                 for (let i = 1; i < filteredLocations.length; i++) {
