@@ -130,6 +130,33 @@ export const UserManagement = () => {
     }
   };
 
+  const handleToggleUserStatus = async (userId: string, enabled: boolean) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-management?action=update', {
+        body: {
+          userId,
+          enabled
+        }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      toast({
+        title: "Success",
+        description: `User ${enabled ? 'enabled' : 'disabled'} successfully!`,
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDelete = async (userId: string, authUserId?: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
@@ -380,7 +407,17 @@ export const UserManagement = () => {
                   {user.role}
                 </span>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={user.enabled !== false}
+                    onCheckedChange={(checked) => handleToggleUserStatus(user.id, checked)}
+                    disabled={loading}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {user.enabled !== false ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
                 <Button
                   size="sm"
                   variant="outline"
