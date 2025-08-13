@@ -131,6 +131,19 @@ export const UserManagement = () => {
   };
 
   const handleToggleUserStatus = async (userId: string, enabled: boolean) => {
+    // Find the user to check if they're an admin
+    const user = users.find(u => u.id === userId);
+    
+    // Prevent disabling admin users
+    if (user?.role === 'admin' && !enabled) {
+      toast({
+        title: "Error",
+        description: "Admin users cannot be disabled",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-management?action=update', {
         body: {
@@ -208,7 +221,7 @@ export const UserManagement = () => {
       password: '',
       start_time: user.start_time ? new Date(user.start_time).toISOString().slice(0, 16) : '',
       end_time: user.end_time ? new Date(user.end_time).toISOString().slice(0, 16) : '',
-      enabled: user.enabled || true
+      enabled: user.enabled !== false // Fix: properly handle the enabled state
     });
     setIsDialogOpen(true);
   };
@@ -339,8 +352,12 @@ export const UserManagement = () => {
                     id="enabled"
                     checked={formData.enabled}
                     onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
+                    disabled={editingUser?.role === 'admin'}
                   />
                   <Label htmlFor="enabled">User Enabled</Label>
+                  {editingUser?.role === 'admin' && (
+                    <span className="text-xs text-muted-foreground">(Admin users cannot be disabled)</span>
+                  )}
                 </div>
                 <div className="flex justify-end space-x-2">
                   <Button
@@ -412,7 +429,7 @@ export const UserManagement = () => {
                   <Switch
                     checked={user.enabled !== false}
                     onCheckedChange={(checked) => handleToggleUserStatus(user.id, checked)}
-                    disabled={loading}
+                    disabled={loading || user.role === 'admin'}
                   />
                   <span className="text-sm text-muted-foreground">
                     {user.enabled !== false ? 'Enabled' : 'Disabled'}
