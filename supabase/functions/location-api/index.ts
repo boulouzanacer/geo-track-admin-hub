@@ -123,17 +123,46 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
 
-      // Insert location data
-      const { data: location, error: locationError } = await supabase
+      // Check if location already exists for this phone
+      const { data: existingLocation } = await supabase
         .from('locations')
-        .insert({
-          phone_id: phone.id,
-          latitude,
-          longitude,
-          timestamp: timestamp || new Date().toISOString()
-        })
-        .select()
+        .select('id')
+        .eq('phone_id', phone.id)
         .single();
+
+      let location, locationError;
+
+      if (existingLocation) {
+        // Update existing location
+        const result = await supabase
+          .from('locations')
+          .update({
+            latitude,
+            longitude,
+            timestamp: timestamp || new Date().toISOString()
+          })
+          .eq('phone_id', phone.id)
+          .select()
+          .single();
+        
+        location = result.data;
+        locationError = result.error;
+      } else {
+        // Insert new location
+        const result = await supabase
+          .from('locations')
+          .insert({
+            phone_id: phone.id,
+            latitude,
+            longitude,
+            timestamp: timestamp || new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        location = result.data;
+        locationError = result.error;
+      }
 
       if (locationError) {
         console.error('Error inserting location:', locationError);
