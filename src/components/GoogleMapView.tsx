@@ -27,7 +27,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
-  const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number}}>({});
+  const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number, timestamp?: string}}>({});
   const [loading, setLoading] = useState(true);
   const [trajectoryInfo, setTrajectoryInfo] = useState<{[phoneId: string]: {distance: number, duration: number, positions: number}}>({});
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -52,7 +52,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
   useEffect(() => {
     const fetchPhoneLocations = async () => {
       try {
-        const locations: {[phoneId: string]: {lat: number, lng: number}} = {};
+        const locations: {[phoneId: string]: {lat: number, lng: number, timestamp?: string}} = {};
         
         for (const phone of phones) {
           try {
@@ -72,7 +72,8 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
               if (locationData && locationData.latitude && locationData.longitude) {
                 locations[phone.phone_id] = {
                   lat: parseFloat(locationData.latitude),
-                  lng: parseFloat(locationData.longitude)
+                  lng: parseFloat(locationData.longitude),
+                  timestamp: locationData.timestamp
                 };
               }
             }
@@ -113,7 +114,8 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
               ...prev,
               [newLocation.phone_id]: {
                 lat: parseFloat(newLocation.latitude),
-                lng: parseFloat(newLocation.longitude)
+                lng: parseFloat(newLocation.longitude),
+                timestamp: newLocation.timestamp
               }
             }));
           }
@@ -202,7 +204,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
             <div class="p-2">
               <h4 class="font-semibold">${phone.name}</h4>
               <p class="text-sm text-gray-600">ID: ${phone.phone_id}</p>
-              <p class="text-sm text-gray-600">Last update: ${formatDistanceToNow(new Date(phone.last_update), { addSuffix: true })}</p>
+              <p class="text-sm text-gray-600">Last update: ${location.timestamp ? formatDistanceToNow(new Date(location.timestamp), { addSuffix: true }) : 'Unknown'}</p>
             </div>
           `
         });
