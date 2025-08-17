@@ -68,6 +68,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
             
             if (response.ok) {
               const data = await response.json();
+              console.log(`Map: Location data for phone ${phone.phone_id}:`, data);
               const locationData = data.location;
               if (locationData && locationData.latitude && locationData.longitude) {
                 locations[phone.phone_id] = {
@@ -75,7 +76,10 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
                   lng: parseFloat(locationData.longitude),
                   timestamp: locationData.timestamp
                 };
+                console.log(`Map: Using timestamp for ${phone.phone_id}:`, locationData.timestamp);
               }
+            } else {
+              console.log(`Map: No location found for phone ${phone.phone_id}, status:`, response.status);
             }
           } catch (err) {
             console.error(`Error fetching location for phone ${phone.phone_id}:`, err);
@@ -97,6 +101,26 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
 
   // Real-time updates
   useEffect(() => {
+    const handleLocationUpdate = (payload: any) => {
+      console.log('Real-time location update received:', payload.new);
+      const newLocation = payload.new as any;
+      
+      // Find the phone that matches this location's phone_id (UUID)
+      const matchingPhone = phones.find(phone => phone.id === newLocation.phone_id);
+      
+      if (matchingPhone && newLocation.latitude && newLocation.longitude) {
+        console.log(`Real-time update for phone ${matchingPhone.phone_id}:`, newLocation);
+        setPhoneLocations(prev => ({
+          ...prev,
+          [matchingPhone.phone_id]: {
+            lat: parseFloat(newLocation.latitude),
+            lng: parseFloat(newLocation.longitude),
+            timestamp: newLocation.timestamp
+          }
+        }));
+      }
+    };
+
     const channel = supabase
       .channel('location-updates')
       .on(
@@ -106,27 +130,23 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
           schema: 'public',
           table: 'locations'
         },
-        (payload) => {
-          const newLocation = payload.new as any;
-          
-          if (newLocation.phone_id && newLocation.latitude && newLocation.longitude) {
-            setPhoneLocations(prev => ({
-              ...prev,
-              [newLocation.phone_id]: {
-                lat: parseFloat(newLocation.latitude),
-                lng: parseFloat(newLocation.longitude),
-                timestamp: newLocation.timestamp
-              }
-            }));
-          }
-        }
+        handleLocationUpdate
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'locations'
+        },
+        handleLocationUpdate
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [phones]);
 
   // Initialize Google Maps
   useEffect(() => {

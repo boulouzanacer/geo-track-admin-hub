@@ -55,10 +55,14 @@ const PhoneList = ({
           });
           
           if (response.ok) {
-            const locationData = await response.json();
-            if (locationData && locationData.timestamp) {
-              timestamps[phone.phone_id] = locationData.timestamp;
+            const data = await response.json();
+            console.log(`Location data for phone ${phone.phone_id}:`, data);
+            if (data.location && data.location.timestamp) {
+              timestamps[phone.phone_id] = data.location.timestamp;
+              console.log(`Using timestamp from location-api for ${phone.phone_id}:`, data.location.timestamp);
             }
+          } else {
+            console.log(`No location data found for phone ${phone.phone_id}, status:`, response.status);
           }
         } catch (error) {
           console.error(`Error fetching location for phone ${phone.phone_id}:`, error);
