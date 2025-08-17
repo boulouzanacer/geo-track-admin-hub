@@ -203,62 +203,65 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Map View */}
-        <div className="mb-6">
-          <GoogleMapView
-            selectedPhone={selectedPhone}
-            phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
-            trackingData={{}}
-          />
-        </div>
+        {/* Main Layout with Sidebar and Map */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Sidebar - Tabs */}
+          <div className="lg:col-span-1">
+            <Tabs defaultValue="overview" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-1 gap-1 h-auto">
+                <TabsTrigger value="overview" className="justify-start">{t('dashboard.overview')}</TabsTrigger>
+                {userProfile.role === 'admin' && (
+                  <TabsTrigger value="users" className="justify-start">{t('dashboard.userManagement')}</TabsTrigger>
+                )}
+              </TabsList>
+              
+              <TabsContent value="overview" className="space-y-4">
+                {/* User Filter for Admins */}
+                {userProfile.role === 'admin' && (
+                  <div className="mb-4">
+                    <div className="flex flex-col gap-2">
+                      <span className="text-sm font-medium">{t('dashboard.filterByUser')}</span>
+                      <UserSelector
+                        selectedUserId={selectedUserId}
+                        onUserSelect={setSelectedUserId}
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Phone List */}
+                <PhoneList
+                  phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+                  selectedPhone={selectedPhone}
+                  onSelectPhone={setSelectedPhone}
+                  userRole={userProfile.role}
+                  currentUserId={userProfile.id}
+                  loading={loading}
+                  onRefresh={fetchPhones}
+                />
+              </TabsContent>
+              
+              {userProfile.role === 'admin' && (
+                <TabsContent value="users" className="space-y-4">
+                  <div className="space-y-6">
+                    <UserManagement />
+                    <PhoneManagement />
+                  </div>
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">{t('dashboard.overview')}</TabsTrigger>
-            {userProfile.role === 'admin' && (
-              <TabsTrigger value="users">{t('dashboard.userManagement')}</TabsTrigger>
-            )}
-          </TabsList>
-          
-          <TabsContent value="overview">
-            {/* User Filter for Admins */}
-            {userProfile.role === 'admin' && (
-              <div className="mb-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">{t('dashboard.filterByUser')}</span>
-                  <UserSelector
-                    selectedUserId={selectedUserId}
-                    onUserSelect={setSelectedUserId}
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Phone List */}
-            <div className="w-full">
-              <PhoneList
-                phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
-                selectedPhone={selectedPhone}
-                onSelectPhone={setSelectedPhone}
-                userRole={userProfile.role}
-                currentUserId={userProfile.id}
-                loading={loading}
-                onRefresh={fetchPhones}
-              />
-            </div>
-          </TabsContent>
-          
-          {userProfile.role === 'admin' && (
-            <TabsContent value="users">
-              <div className="grid gap-6">
-                <UserManagement />
-                <PhoneManagement />
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
+          {/* Right Side - Map */}
+          <div className="lg:col-span-3">
+            <GoogleMapView
+              selectedPhone={selectedPhone}
+              phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+              trackingData={{}}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
