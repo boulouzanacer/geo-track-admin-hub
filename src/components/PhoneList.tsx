@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,41 @@ const PhoneList = ({
   onRefresh
 }: PhoneListProps) => {
   const [refreshing, setRefreshing] = useState(false);
+  const [phoneTimestamps, setPhoneTimestamps] = useState<{[phoneId: string]: string}>({});
+
+  useEffect(() => {
+    const fetchPhoneTimestamps = async () => {
+      const timestamps: {[phoneId: string]: string} = {};
+      
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      for (const phone of phones) {
+        try {
+          const response = await fetch(`/functions/v1/location-api/phone/${phone.phone_id}`, {
+            headers: {
+              'Authorization': `Bearer ${session?.access_token || ''}`
+            }
+          });
+          
+          if (response.ok) {
+            const locationData = await response.json();
+            if (locationData && locationData.timestamp) {
+              timestamps[phone.phone_id] = locationData.timestamp;
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching location for phone ${phone.phone_id}:`, error);
+        }
+      }
+      
+      setPhoneTimestamps(timestamps);
+    };
+
+    if (phones.length > 0) {
+      fetchPhoneTimestamps();
+    }
+  }, [phones]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -44,14 +79,27 @@ const PhoneList = ({
     setRefreshing(false);
   };
 
-  const getStatusColor = (lastUpdate: string) => {
-    const lastUpdateTime = new Date(lastUpdate);
+  const getStatusColor = (phone: Phone) => {
+    const timestamp = phoneTimestamps[phone.phone_id] || phone.last_update;
+    const lastUpdateTime = new Date(timestamp);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastUpdateTime.getTime()) / (1000 * 60);
     
     if (diffMinutes < 5) return 'bg-green-500';
     if (diffMinutes < 30) return 'bg-yellow-500';
     return 'bg-red-500';
+  };
+
+  const getDisplayTimestamp = (phone: Phone) => {
+    return phoneTimestamps[phone.phone_id] || phone.last_update;
+  };
+
+  const getStatusText = (phone: Phone) => {
+    const timestamp = phoneTimestamps[phone.phone_id] || phone.last_update;
+    const diffMinutes = (new Date().getTime() - new Date(timestamp).getTime()) / (1000 * 60);
+    if (diffMinutes < 5) return 'Online';
+    if (diffMinutes < 30) return 'Recent';
+    return 'Offline';
   };
 
   const filteredPhones = userRole === 'admin' 
@@ -114,7 +162,7 @@ const PhoneList = ({
                         onUpdate={onRefresh}
                       />
                     )}
-                    <div className={`w-2 h-2 rounded-full ${getStatusColor(phone.last_update)}`} />
+                    <div className={`w-2 h-2 rounded-full ${getStatusColor(phone)}`} />
                   </div>
                 </div>
                 
@@ -128,7 +176,7 @@ const PhoneList = ({
                 <div className="flex items-center gap-1">
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(phone.last_update), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(getDisplayTimestamp(phone)), { addSuffix: true })}
                   </span>
                 </div>
                 
@@ -136,12 +184,7 @@ const PhoneList = ({
                   variant="secondary" 
                   className="text-xs mt-2"
                 >
-                  {(() => {
-                    const diffMinutes = (new Date().getTime() - new Date(phone.last_update).getTime()) / (1000 * 60);
-                    if (diffMinutes < 5) return 'Online';
-                    if (diffMinutes < 30) return 'Recent';
-                    return 'Offline';
-                  })()}
+                  {getStatusText(phone)}
                 </Badge>
               </div>
             ))
