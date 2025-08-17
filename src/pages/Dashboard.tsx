@@ -206,51 +206,70 @@ const Dashboard = () => {
         {/* Main Layout with Sidebar and Map */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Sidebar - Tabs */}
-          <div className="lg:col-span-1">
-            <Tabs defaultValue="overview" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-1 gap-1 h-auto">
-                <TabsTrigger value="overview" className="justify-start">{t('dashboard.overview')}</TabsTrigger>
-                {userProfile.role === 'admin' && (
-                  <TabsTrigger value="users" className="justify-start">{t('dashboard.userManagement')}</TabsTrigger>
-                )}
-              </TabsList>
-              
-              <TabsContent value="overview" className="space-y-4">
-                {/* User Filter for Admins */}
-                {userProfile.role === 'admin' && (
-                  <div className="mb-4">
-                    <div className="flex flex-col gap-2">
-                      <span className="text-sm font-medium">{t('dashboard.filterByUser')}</span>
-                      <UserSelector
-                        selectedUserId={selectedUserId}
-                        onUserSelect={setSelectedUserId}
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                {/* Phone List */}
-                <PhoneList
-                  phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
-                  selectedPhone={selectedPhone}
-                  onSelectPhone={setSelectedPhone}
-                  userRole={userProfile.role}
-                  currentUserId={userProfile.id}
-                  loading={loading}
-                  onRefresh={fetchPhones}
-                />
-              </TabsContent>
-              
-              {userProfile.role === 'admin' && (
-                <TabsContent value="users" className="space-y-4">
-                  <div className="space-y-6">
-                    <UserManagement />
-                    <PhoneManagement />
-                  </div>
-                </TabsContent>
-              )}
-            </Tabs>
+          <div className="lg:col-span-1 space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Navigation</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Tabs defaultValue="overview" className="w-full" orientation="vertical">
+                  <TabsList className="grid w-full grid-cols-1 h-auto bg-muted/50">
+                    <TabsTrigger 
+                      value="overview" 
+                      className="justify-start data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      {t('dashboard.overview')}
+                    </TabsTrigger>
+                    {userProfile.role === 'admin' && (
+                      <TabsTrigger 
+                        value="users" 
+                        className="justify-start data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        {t('dashboard.userManagement')}
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
+                  
+                  <TabsContent value="overview" className="mt-4 space-y-4">
+                    {/* User Filter for Admins */}
+                    {userProfile.role === 'admin' && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm">{t('dashboard.filterByUser')}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <UserSelector
+                            selectedUserId={selectedUserId}
+                            onUserSelect={setSelectedUserId}
+                            disabled={loading}
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Phone List */}
+                    <PhoneList
+                      phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+                      selectedPhone={selectedPhone}
+                      onSelectPhone={setSelectedPhone}
+                      userRole={userProfile.role}
+                      currentUserId={userProfile.id}
+                      loading={loading}
+                      onRefresh={fetchPhones}
+                    />
+                  </TabsContent>
+                  
+                  {userProfile.role === 'admin' && (
+                    <TabsContent value="users" className="mt-4 space-y-4">
+                      <UserManagement />
+                      <PhoneManagement />
+                    </TabsContent>
+                  )}
+                </Tabs>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Side - Map */}
