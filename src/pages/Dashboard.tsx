@@ -203,6 +203,15 @@ const Dashboard = () => {
           </Card>
         </div>
 
+        {/* Map View */}
+        <div className="mb-6">
+          <GoogleMapView
+            selectedPhone={selectedPhone}
+            phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+            trackingData={{}}
+          />
+        </div>
+
         {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
@@ -227,29 +236,17 @@ const Dashboard = () => {
               </div>
             )}
             
-            {/* Main Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Phone List */}
-              <div className="lg:col-span-1">
-                <PhoneList
-                  phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
-                  selectedPhone={selectedPhone}
-                  onSelectPhone={setSelectedPhone}
-                  userRole={userProfile.role}
-                  currentUserId={userProfile.id}
-                  loading={loading}
-                  onRefresh={fetchPhones}
-                />
-              </div>
-
-              {/* Map */}
-              <div className="lg:col-span-3">
-                <GoogleMapView
-                  selectedPhone={selectedPhone}
-                  phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
-                  trackingData={{}}
-                />
-              </div>
+            {/* Phone List */}
+            <div className="w-full">
+              <PhoneList
+                phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+                selectedPhone={selectedPhone}
+                onSelectPhone={setSelectedPhone}
+                userRole={userProfile.role}
+                currentUserId={userProfile.id}
+                loading={loading}
+                onRefresh={fetchPhones}
+              />
             </div>
           </TabsContent>
           
