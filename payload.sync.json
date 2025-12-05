@@ -1,0 +1,128 @@
+{
+  "device": {
+    "device_id": "ab6g2349uf434b09",
+    "latitude": 36.7525,
+    "longitude": 3.04197,
+    "timestamp": "2025-11-21T01:13:54Z",
+    "name": "Demo Device"
+  },
+  "stats": {
+    "nbr_bon1": 1,
+    "nbr_bon2": 2,
+    "nbr_bon1_temp": 1,
+    "nbr_bon2_temp": 1
+  },
+  "bon1": [
+    {
+      "header": {
+        "NUM_BON": "000001",
+        "CODE_CLIENT": "C0001",
+        "DATE_BON": "21/11/2025",
+        "HEURE": "01:13:54",
+        "NBR_P": 2,
+        "TOT_QTE": 3,
+        "MODE_TARIF": "TARIF 1",
+        "CODE_DEPOT": "DEPOT1",
+        "MODE_RG": "ESPECES",
+        "CODE_VENDEUR": "VEND001",
+        "TOT_HT": 105.0,
+        "TOT_TVA": 0.0,
+        "TIMBRE": 0.0,
+        "TIMBRE_CHECK": "N",
+        "LATITUDE": 36.7525,
+        "LONGITUDE": 3.04197,
+        "REMISE": 0.0,
+        "MONTANT_ACHAT": 0.0,
+        "ANCIEN_SOLDE": 0.0,
+        "EXPORTATION": "N",
+        "BLOCAGE": "F",
+        "VERSER": 0.0,
+        "LIVRER": 0,
+        "DATE_LIV": null,
+        "IS_IMPORTED": 0,
+        "IS_EXPORTED": 0
+      },
+      "items": [
+        {
+          "CODE_BARRE": "001",
+          "PRODUIT": "001 TEST",
+          "NBRE_COLIS": 0,
+          "COLISSAGE": 0,
+          "QTE_GRAT": 0,
+          "QTE": 1,
+          "PV_HT": 105.0,
+          "PA_HT": 0.0,
+          "DESTOCK_TYPE": null,
+          "DESTOCK_CODE_BARRE": null,
+          "DESTOCK_QTE": 0,
+          "TVA": 0.0,
+          "CODE_DEPOT": "DEPOT1"
+        },
+        {
+          "CODE_BARRE": "16P",
+          "PRODUIT": "16 P SOUMAM",
+          "NBRE_COLIS": 0,
+          "COLISSAGE": 0,
+          "QTE_GRAT": 0,
+          "QTE": 2,
+          "PV_HT": 0.0,
+          "PA_HT": 0.0,
+          "DESTOCK_TYPE": null,
+          "DESTOCK_CODE_BARRE": null,
+          "DESTOCK_QTE": 0,
+          "TVA": 0.0,
+          "CODE_DEPOT": "DEPOT1"
+        }
+      ]
+    }
+  ],
+  "bon1_temp": [
+    {
+      "header": {
+        "NUM_BON": "T000001",
+        "CODE_CLIENT": "C0001",
+        "DATE_BON": "21/11/2025",
+        "HEURE": "01:20:00",
+        "NBR_P": 1,
+        "TOT_QTE": 1,
+        "MODE_TARIF": "TARIF 1",
+        "CODE_DEPOT": "DEPOT1",
+        "MODE_RG": "ESPECES",
+        "CODE_VENDEUR": "VEND001",
+        "TOT_HT": 50.0,
+        "TOT_TVA": 0.0,
+        "TIMBRE": 0.0,
+        "TIMBRE_CHECK": "N",
+        "LATITUDE": 36.7525,
+        "LONGITUDE": 3.04197,
+        "REMISE": 0.0,
+        "MONTANT_ACHAT": 0.0,
+        "ANCIEN_SOLDE": 0.0,
+        "EXPORTATION": "N",
+        "BLOCAGE": "F",
+        "VERSER": 0.0,
+        "LIVRER": 0,
+        "DATE_LIV": null,
+        "IS_IMPORTED": 0,
+        "IS_EXPORTED": 0
+      },
+      "items": [
+        {
+          "CODE_BARRE": "002",
+          "PRODUIT": "002 DEMO",
+          "NBRE_COLIS": 0,
+          "COLISSAGE": 0,
+          "QTE_GRAT": 0,
+          "QTE": 1,
+          "PV_HT": 50.0,
+          "PA_HT": 0.0,
+          "DESTOCK_TYPE": null,
+          "DESTOCK_CODE_BARRE": null,
+          "DESTOCK_QTE": 0,
+          "TVA": 0.0,
+          "CODE_DEPOT": "DEPOT1"
+        }
+      ]
+    }
+  ]
+}

@@ -1,12 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+
+type ClientUser = {
+  id: number;
+  name: string;
+  statut?: string;
+  expire_date?: string | null;
+  is_admin?: boolean;
+};
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  user: ClientUser | null;
+  signIn: (username: string, password: string) => Promise<{ error?: any }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
   loading: boolean;
 }
@@ -26,71 +31,71 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<ClientUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch user');
+        const data = await res.json();
+        setUser(data);
+      } catch (e) {
+        localStorage.removeItem('auth_token');
+        setUser(null);
+      } finally {
         setLoading(false);
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    })();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+  const signIn = async (username: string, password: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      // Safely parse JSON; if not JSON, fallback to text to avoid "Unexpected end of JSON input"
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch (_) {
+        const text = await res.text().catch(() => '');
+        data = text ? { error: text } : {};
+      }
+      if (!res.ok) {
+        const msg = (data && typeof data === 'object' && data.error) ? data.error : `Login failed (${res.status})`;
+        return { error: { message: msg } };
+      }
+      if (data?.token) localStorage.setItem('auth_token', data.token);
+      setUser(data?.user || null);
+      return {};
+    } catch (err: any) {
+      return { error: { message: err?.message || 'Unknown error' } };
+    }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name: name
-        }
-      }
-    });
-    return { error };
+  // SignUp is not supported via UI; return an error to keep existing call safe
+  const signUp = async (_email: string, _password: string, _name: string) => {
+    return { error: { message: 'Signup disabled. Please contact administrator.' } };
   };
 
   const signOut = async () => {
-    try {
-      // Clear local state first
-      setUser(null);
-      setSession(null);
-      
-      // Then attempt to sign out from Supabase
-      await supabase.auth.signOut();
-    } catch (error) {
-      // Even if the server signout fails, we've cleared local state
-      console.log('Signout completed locally');
-    }
+    localStorage.removeItem('auth_token');
+    setUser(null);
   };
 
   const value = {
     user,
-    session,
     signIn,
     signUp,
     signOut,

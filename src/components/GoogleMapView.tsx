@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, Navigation, Clock, Route } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Loader } from '@googlemaps/js-api-loader';
-import { supabase } from '@/integrations/supabase/client';
+// Marker clustering will be loaded at runtime via script tag to avoid build-time deps
+import MapView from '@/components/MapView';
 
 interface Phone {
   id: string;
@@ -21,9 +22,11 @@ interface GoogleMapViewProps {
   selectedPhone: Phone | null;
   phones: Phone[];
   trackingData?: any;
+  fullScreen?: boolean;
+  resizeSignal?: number;
 }
 
-const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapViewProps) => {
+const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal }: GoogleMapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
@@ -33,19 +36,35 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
   const markersRef = useRef<google.maps.Marker[]>([]);
   const routesRef = useRef<google.maps.DirectionsRenderer[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
+  const clustererRef = useRef<any>(null);
+  const [gmError, setGmError] = useState<string | null>(null);
 
-  // Get Google Maps API key from Supabase secrets
+  // Prefer backend config for API key; fallback to env only if server returns empty
   useEffect(() => {
-    const getGoogleMapsKey = async () => {
+    (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        if (error) throw error;
-        setGoogleMapsKey(data.googleMapsKey);
-      } catch (error) {
-        console.error('Error getting Google Maps API key:', error);
+        let res = await fetch('/api/config/map-keys');
+        if (!res.ok) {
+          res = await fetch('http://localhost:5003/api/config/map-keys');
+        }
+        if (res.ok) {
+          const data = await res.json();
+          const fromServer = data.googleMapsKey || '';
+          if (fromServer) {
+            setGoogleMapsKey(fromServer);
+          } else {
+            const fromEnv = import.meta.env.VITE_GOOGLE_MAPS_KEY as string | undefined;
+            if (fromEnv) setGoogleMapsKey(fromEnv);
+          }
+        } else {
+          const fromEnv = import.meta.env.VITE_GOOGLE_MAPS_KEY as string | undefined;
+          if (fromEnv) setGoogleMapsKey(fromEnv);
+        }
+      } catch {
+        const fromEnv = import.meta.env.VITE_GOOGLE_MAPS_KEY as string | undefined;
+        if (fromEnv) setGoogleMapsKey(fromEnv);
       }
-    };
-    getGoogleMapsKey();
+    })();
   }, []);
 
   // Fetch phone locations
@@ -56,27 +75,17 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
         
         for (const phone of phones) {
           try {
-            const functionUrl = `https://ebwbrjkqrsgumlwvhrhb.supabase.co/functions/v1/location-api/phone/${phone.phone_id}`;
-            
-            const response = await fetch(functionUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVid2JyamtxcnNndW1sd3ZocmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjg3MDUsImV4cCI6MjA2ODYwNDcwNX0.DdJjvA0S3rMMAqvxfLKMPhYo2fQkwRrHj1KFOKgmXOc`,
-                'Content-Type': 'application/json',
-              }
-            });
+            const response = await fetch(`/api/locations/latest?phone_id=${phone.phone_id}`);
             
             if (response.ok) {
               const data = await response.json();
-              console.log(`Map: Location data for phone ${phone.phone_id}:`, data);
-              const locationData = data.location;
-              if (locationData && locationData.latitude && locationData.longitude) {
+              if (data && data.latitude && data.longitude) {
                 locations[phone.phone_id] = {
-                  lat: parseFloat(locationData.latitude),
-                  lng: parseFloat(locationData.longitude),
-                  timestamp: locationData.timestamp
+                  lat: parseFloat(data.latitude),
+                  lng: parseFloat(data.longitude),
+                  timestamp: data.timestamp
                 };
-                console.log(`Map: Using timestamp for ${phone.phone_id}:`, locationData.timestamp);
+                console.log(`Map: Using timestamp for ${phone.phone_id}:`, data.timestamp);
               }
             } else {
               console.log(`Map: No location found for phone ${phone.phone_id}, status:`, response.status);
@@ -99,53 +108,30 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
     }
   }, [phones]);
 
-  // Real-time updates
+  // Poll for latest locations periodically (every 10s)
   useEffect(() => {
-    const handleLocationUpdate = (payload: any) => {
-      console.log('Real-time location update received:', payload.new);
-      const newLocation = payload.new as any;
-      
-      // Find the phone that matches this location's phone_id (UUID)
-      const matchingPhone = phones.find(phone => phone.id === newLocation.phone_id);
-      
-      if (matchingPhone && newLocation.latitude && newLocation.longitude) {
-        console.log(`Real-time update for phone ${matchingPhone.phone_id}:`, newLocation);
-        setPhoneLocations(prev => ({
-          ...prev,
-          [matchingPhone.phone_id]: {
-            lat: parseFloat(newLocation.latitude),
-            lng: parseFloat(newLocation.longitude),
-            timestamp: newLocation.timestamp
+    const interval = setInterval(async () => {
+      const updates: {[phoneId: string]: {lat: number, lng: number, timestamp?: string}} = {};
+      for (const phone of phones) {
+        try {
+          const res = await fetch(`/api/locations/latest?phone_id=${phone.phone_id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.latitude && data.longitude) {
+              updates[phone.phone_id] = {
+                lat: parseFloat(data.latitude),
+                lng: parseFloat(data.longitude),
+                timestamp: data.timestamp,
+              };
+            }
           }
-        }));
+        } catch {}
       }
-    };
-
-    const channel = supabase
-      .channel('location-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'locations'
-        },
-        handleLocationUpdate
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'locations'
-        },
-        handleLocationUpdate
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      if (Object.keys(updates).length > 0) {
+        setPhoneLocations(prev => ({ ...prev, ...updates }));
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, [phones]);
 
   // Initialize Google Maps
@@ -167,9 +153,23 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
           streetViewControl: true,
           fullscreenControl: true,
         });
+
+        // Load marker clusterer library dynamically
+        const existing = document.querySelector('script[data-clusterer]');
+        if (!existing) {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js';
+          script.async = true;
+          script.dataset.clusterer = 'true';
+          script.onload = () => {
+            // Ready to use on next render cycle
+          };
+          document.head.appendChild(script);
+        }
       }
     }).catch(error => {
       console.error('Error loading Google Maps:', error);
+      setGmError(error?.message || 'Failed to load Google Maps');
     });
 
     return () => {
@@ -180,17 +180,40 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
     };
   }, [googleMapsKey]);
 
+  // Capture Google Maps auth failures (e.g., invalid key, billing, referrer restrictions)
+  useEffect(() => {
+    (window as any).gm_authFailure = () => {
+      setGmError('Google Maps authentication failed');
+    };
+    return () => {
+      try { delete (window as any).gm_authFailure; } catch {}
+    };
+  }, []);
+
+  // Trigger map resize when layout changes (e.g., panels collapse/expand)
+  useEffect(() => {
+    if (map.current) {
+      try {
+        // Notify Google Maps of container size changes
+        google.maps.event.trigger(map.current, 'resize');
+      } catch {}
+    }
+  }, [resizeSignal]);
+
   // Add markers and routes
   useEffect(() => {
     if (!map.current || Object.keys(phoneLocations).length === 0) return;
 
-    // Clear existing markers and routes
+    // Clear existing markers, routes, and clustering
     markersRef.current.forEach(marker => marker.setMap(null));
     routesRef.current.forEach(renderer => renderer.setMap(null));
     polylinesRef.current.forEach(polyline => polyline.setMap(null));
     markersRef.current = [];
     routesRef.current = [];
     polylinesRef.current = [];
+    if (clustererRef.current && typeof clustererRef.current.clearMarkers === 'function') {
+      try { clustererRef.current.clearMarkers(); } catch {}
+    }
 
     const bounds = new google.maps.LatLngBounds();
     let hasValidLocations = false;
@@ -438,6 +461,16 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
       });
     }
 
+    // Apply marker clustering if library is available
+    const MC = (window as any).markerClusterer || (window as any).MarkerClusterer;
+    if (MC && markersRef.current.length > 0) {
+      try {
+        clustererRef.current = new MC({ markers: markersRef.current, map: map.current });
+      } catch {
+        // If constructor signature differs, fallback silently
+      }
+    }
+
     // Fit map to show all markers
     if (hasValidLocations) {
       if (phones.filter(phone => phoneLocations[phone.phone_id]).length === 1) {
@@ -452,7 +485,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
 
   if (!googleMapsKey) {
     return (
-      <Card className="h-full">
+      <Card className={fullScreen ? "absolute inset-0 m-0" : "h-full"}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -460,7 +493,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center">
+          <div className={fullScreen ? "w-full h-full min-h-screen bg-muted rounded-none flex items-center justify-center" : "w-full h-96 bg-muted rounded-lg flex items-center justify-center"}>
             <div className="text-center">
               <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">Loading Map...</h3>
@@ -471,7 +504,51 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {} }: GoogleMapVi
       </Card>
     );
   }
+
+  // If Google Maps fails at runtime, attempt Mapbox fallback or show a helpful error
+  if (gmError) {
+    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+    if (mapboxToken) {
+      return (
+        <MapView
+          fullScreen={fullScreen}
+          resizeSignal={resizeSignal}
+          selectedPhone={selectedPhone}
+          phones={phones}
+          trackingData={trackingData}
+        />
+      );
+    }
+
+    return (
+      <Card className={fullScreen ? "absolute inset-0 m-0" : "h-full"}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Google Maps error
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className={fullScreen ? "w-full h-full min-h-screen bg-muted rounded-none flex items-center justify-center" : "w-full h-96 bg-muted rounded-lg flex items-center justify-center"}>
+            <div className="text-center">
+              <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">Google Maps ne s'est pas chargé</h3>
+              <p className="text-sm text-muted-foreground mb-2">{gmError}</p>
+              <p className="text-sm text-muted-foreground">Vérifiez votre clé (`VITE_GOOGLE_MAPS_KEY`), la facturation, et les restrictions de référent pour `localhost:{window.location.port}`. Ou définissez `VITE_MAPBOX_TOKEN` dans `.env` pour utiliser Mapbox.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
+  // Full-screen mode: render only the map container, panels are managed by the page overlay
+  if (fullScreen) {
+    return (
+      <div ref={mapContainer} className="absolute inset-0" />
+    );
+  }
+
   return (
     <Card className="h-full">
       <CardHeader>

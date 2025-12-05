@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+// Supabase removed: use backend API endpoints
 import { Edit, Trash2 } from 'lucide-react';
 
 interface Phone {
@@ -39,12 +39,15 @@ export const UserPhoneActions = ({ phone, onUpdate }: UserPhoneActionsProps) => 
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('phones')
-        .update({ name: phoneName.trim() })
-        .eq('id', phone.id);
-
-      if (error) throw error;
+      const res = await fetch(`/api/phones/${phone.phone_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: phoneName.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to update phone');
+      }
 
       toast({
         title: "Success",
@@ -68,12 +71,11 @@ export const UserPhoneActions = ({ phone, onUpdate }: UserPhoneActionsProps) => 
   const handleDeletePhone = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('phones')
-        .delete()
-        .eq('id', phone.id);
-
-      if (error) throw error;
+      const res = await fetch(`/api/phones/${phone.phone_id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to delete phone');
+      }
 
       toast({
         title: "Success",

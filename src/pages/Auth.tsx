@@ -35,7 +35,7 @@ const Auth = () => {
     if (error) {
       toast({
         title: t('auth.error'),
-        description: error.message,
+        description: typeof error === 'string' ? error : (error?.message || 'Login failed'),
         variant: "destructive",
       });
     } else {
@@ -57,7 +57,7 @@ const Auth = () => {
     if (error) {
       toast({
         title: t('auth.error'),
-        description: error.message,
+        description: typeof error === 'string' ? error : (error?.message || 'Signup error'),
         variant: "destructive",
       });
     } else {
@@ -89,10 +89,10 @@ const Auth = () => {
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">{t('auth.email')}</Label>
+                  <Label htmlFor="signin-username">Username</Label>
                   <Input
-                    id="signin-email"
-                    type="email"
+                    id="signin-username"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required

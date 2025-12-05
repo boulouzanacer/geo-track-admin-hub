@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+// Settings page disabled: use SettingsPanel in Dashboard drawer
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,8 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
+              {/* Route /settings is deprecated; redirect to /dashboard to avoid duplication */}
+              <Route path="/settings" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

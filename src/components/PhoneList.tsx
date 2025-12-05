@@ -48,21 +48,36 @@ const PhoneList = ({
       
       for (const phone of phones) {
         try {
-          const response = await fetch(`/functions/v1/location-api/phone/${phone.phone_id}`, {
-            headers: {
-              'Authorization': `Bearer ${session?.access_token || ''}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Location data for phone ${phone.phone_id}:`, data);
-            if (data.location && data.location.timestamp) {
-              timestamps[phone.phone_id] = data.location.timestamp;
-              console.log(`Using timestamp from location-api for ${phone.phone_id}:`, data.location.timestamp);
+          const url = `/api/locations/latest?phone_id=${encodeURIComponent(phone.phone_id)}`;
+          const response = await fetch(url);
+
+          const contentType = response.headers.get('content-type') || '';
+          let payload: any = null;
+          if (contentType.includes('application/json')) {
+            try {
+              payload = await response.json();
+            } catch (e) {
+              const txt = await response.text();
+              console.error(`Failed to parse JSON for ${phone.phone_id}; body as text:`, txt);
+              throw e;
             }
           } else {
+            const txt = await response.text();
+            console.warn(`Non-JSON response for ${phone.phone_id} from ${url}:`, txt);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${txt.slice(0, 200)}`);
+            }
+          }
+
+          if (!response.ok) {
             console.log(`No location data found for phone ${phone.phone_id}, status:`, response.status);
+            continue;
+          }
+
+          console.log(`Location data for phone ${phone.phone_id}:`, payload);
+          if (payload && payload.timestamp) {
+            timestamps[phone.phone_id] = payload.timestamp;
+            console.log(`Using timestamp from API for ${phone.phone_id}:`, payload.timestamp);
           }
         } catch (error) {
           console.error(`Error fetching location for phone ${phone.phone_id}:`, error);
@@ -106,9 +121,9 @@ const PhoneList = ({
     return 'Offline';
   };
 
-  const filteredPhones = userRole === 'admin' 
-    ? phones 
-    : phones.filter(phone => phone.user_id === currentUserId);
+  const filteredPhones = userRole === 'admin'
+    ? phones
+    : phones.filter(phone => String(phone.user_id) === String(currentUserId));
 
   return (
     <Card className="h-full">

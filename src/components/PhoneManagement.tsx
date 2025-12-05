@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+// Supabase removed: use backend API endpoints
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,14 +48,11 @@ export const PhoneManagement = () => {
 
   const fetchPhones = async () => {
     try {
-      const { data, error } = await supabase
-        .from('phones')
-        .select('*, users!inner(name)')
-        .order('name');
-
-      if (error) throw error;
-      setPhones(data || []);
-      setFilteredPhones(data || []);
+      const res = await fetch('/api/phones');
+      if (!res.ok) throw new Error('Failed to fetch phones');
+      const data = await res.json();
+      setPhones(Array.isArray(data) ? data : []);
+      setFilteredPhones(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -67,13 +64,10 @@ export const PhoneManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, email')
-        .order('name');
-
-      if (error) throw error;
-      setUsers(data || []);
+      const res = await fetch('/api/users');
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -90,15 +84,19 @@ export const PhoneManagement = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('phones')
-        .insert({
+      const res = await fetch('/api/phones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           phone_id: formData.phone_id,
           name: formData.name,
-          user_id: formData.user_id
-        });
-
-      if (error) throw error;
+          user_id: formData.user_id,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to add phone');
+      }
 
       toast({
         title: "Success",
@@ -123,12 +121,11 @@ export const PhoneManagement = () => {
     if (!confirm('Are you sure you want to delete this phone?')) return;
 
     try {
-      const { error } = await supabase
-        .from('phones')
-        .delete()
-        .eq('id', phoneId);
-
-      if (error) throw error;
+      const res = await fetch(`/api/phones/${phoneId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to delete phone');
+      }
 
       toast({
         title: "Success",

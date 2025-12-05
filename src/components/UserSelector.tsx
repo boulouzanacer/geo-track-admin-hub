@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   Command,
@@ -44,23 +43,20 @@ export function UserSelector({ selectedUserId, onUserSelect, disabled }: UserSel
 
   const fetchUsers = async () => {
     setLoading(true);
-    
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, name, email')
-      .order('name');
-
-    if (error) {
+    try {
+      const res = await fetch('/api/users');
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
       toast({
         title: "Error",
         description: "Failed to fetch users",
         variant: "destructive",
       });
-    } else {
-      setUsers(data || []);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const handleClear = () => {

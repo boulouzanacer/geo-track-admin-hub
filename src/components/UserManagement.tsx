@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +29,7 @@ export const UserManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [phonesByUserId, setPhonesByUserId] = useState<Record<string, { phone_id: string; name: string }[]>>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -44,16 +44,33 @@ export const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchPhones();
   }, []);
+
+  const fetchPhones = async () => {
+    try {
+      const res = await fetch('/api/phones');
+      if (!res.ok) return;
+      const data = await res.json();
+      const grouped: Record<string, { phone_id: string; name: string }[]> = {};
+      (Array.isArray(data) ? data : []).forEach((p: any) => {
+        const uid = String(p.user_id ?? '');
+        if (!uid) return;
+        if (!grouped[uid]) grouped[uid] = [];
+        grouped[uid].push({ phone_id: String(p.phone_id), name: String(p.name) });
+      });
+      setPhonesByUserId(grouped);
+    } catch {}
+  };
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/admin/users', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
+      const data = await res.json();
       setUsers(data || []);
       setFilteredUsers(data || []);
     } catch (error: any) {
@@ -73,42 +90,44 @@ export const UserManagement = () => {
 
     try {
       if (editingUser) {
-        // Update existing user via edge function
-        const { data, error } = await supabase.functions.invoke('admin-user-management?action=update', {
-          body: {
-            userId: editingUser.id,
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/admin/users/${editingUser.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
             name: formData.name,
             email: formData.email,
             role: formData.role,
-            start_time: formData.start_time || null,
-            end_time: formData.end_time || null,
-            enabled: formData.enabled
-          }
+            enabled: formData.enabled,
+            password: formData.password || undefined,
+          }),
         });
-
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+        if (!res.ok) throw new Error(`Update failed (${res.status})`);
 
         toast({
           title: "Success",
           description: "User updated successfully!",
         });
       } else {
-        // Create new user via edge function
-        const { data, error } = await supabase.functions.invoke('admin-user-management?action=create', {
-          body: {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
             email: formData.email,
             password: formData.password,
             name: formData.name,
             role: formData.role,
-            start_time: formData.start_time || null,
-            end_time: formData.end_time || null,
-            enabled: formData.enabled
-          }
+            enabled: formData.enabled,
+          }),
         });
-
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+        if (!res.ok) throw new Error(`Create failed (${res.status})`);
 
         toast({
           title: "Success",
@@ -145,15 +164,16 @@ export const UserManagement = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-management?action=update', {
-        body: {
-          userId,
-          enabled
-        }
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ enabled }),
       });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (!res.ok) throw new Error(`Update failed (${res.status})`);
 
       toast({
         title: "Success",
@@ -174,15 +194,12 @@ export const UserManagement = () => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-management?action=delete', {
-        body: {
-          userId,
-          authUserId
-        }
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
 
       toast({
         title: "Success",
@@ -423,6 +440,17 @@ export const UserManagement = () => {
                 }`}>
                   {user.role}
                 </span>
+                {/* Associated devices */}
+                <div className="mt-2 text-xs">
+                  <span className="text-muted-foreground">Devices:</span>{' '}
+                  {phonesByUserId[user.id]?.length ? (
+                    <span>
+                      {phonesByUserId[user.id].map((p) => p.name || p.phone_id).join(', ')}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">None</span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2">

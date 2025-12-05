@@ -71,3 +71,54 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+# vite_react_shadcn_ts
+
+## Database Setup (MySQL)
+
+This project expects three MySQL tables: `clients`, `phones`, and `locations`. If your database only has `clients` or is missing some columns, run the schema script provided.
+
+### 1) Configure `.env`
+
+- `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` should point to your MySQL.
+- Optional: `API_PORT` for the backend server port.
+
+### 2) Create/align tables
+
+Use the schema file to create tables and add missing columns:
+
+```
+mysql -h <host> -P <port> -u <user> -p <database> < server/mysql/schema.sql
+```
+
+This will:
+- Create `clients` with expected columns if it doesn’t exist.
+- Add any missing columns to `clients` (MySQL 8.0+ IF NOT EXISTS).
+- Create `phones` and `locations` with proper foreign keys.
+
+### 3) Add an account
+
+Generate a bcrypt hash and insert a client row:
+
+```
+node -e "const bcrypt=require('bcryptjs');bcrypt.genSalt(10).then(s=>bcrypt.hash('YourPassword',s)).then(h=>console.log(h))"
+```
+
+Then run:
+
+```
+INSERT INTO clients (username, password, full_name, email, phone_number, statut, last_login, nbr_phones, expire_date)
+VALUES ('demo', '<paste hash here>', 'Demo User', 'demo@example.com', '0000000000', 'active', NOW(), 0, DATE_ADD(CURDATE(), INTERVAL 1 YEAR));
+```
+
+### 4) Run servers
+
+```
+$env:API_PORT=5002; npm run server
+$env:API_PORT=5002; npm run dev
+```
+
+Frontend at `http://localhost:8080/`, backend at `http://localhost:5002`.
+
+### Notes
+- Login uses `username` from `clients` and verifies bcrypt hashes; if a plaintext password is present, backend falls back to plaintext comparison.
+- `/api/auth/me` fetches by `username` from the JWT, avoiding strict reliance on specific PK column names.

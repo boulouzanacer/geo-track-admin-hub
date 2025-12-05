@@ -5,7 +5,7 @@ import { MapPin, Navigation, Clock, Route } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { supabase } from '@/integrations/supabase/client';
+// Supabase removed: use backend API and env token
 
 interface Phone {
   id: string;
@@ -22,28 +22,70 @@ interface MapViewProps {
   selectedPhone: Phone | null;
   phones: Phone[];
   trackingData?: any;
+  fullScreen?: boolean;
+  resizeSignal?: number;
 }
 
-const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => {
+const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [mapError, setMapError] = useState<string | null>(null);
   const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number}}>({});
   const [loading, setLoading] = useState(true);
   const [trajectoryInfo, setTrajectoryInfo] = useState<{[phoneId: string]: {distance: number, duration: number, positions: number}}>({});
 
-  // Get Mapbox token from Supabase secrets
+  // Prefer backend config for token; fallback to env only if server returns empty
+  const isPlaceholderToken = (t: string) => {
+    const trimmed = (t || '').trim();
+    if (!trimmed) return true;
+    if (/YOUR_MAPBOX_ACCESS_TOKEN/i.test(trimmed)) return true;
+    if (/your_mapbox_token/i.test(trimmed)) return true;
+    // Mapbox public tokens typically start with "pk."; treat others as invalid for GL JS
+    if (!trimmed.startsWith('pk.')) return true;
+    return false;
+  };
+
   useEffect(() => {
-    const getMapboxToken = async () => {
+    (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        if (error) throw error;
-        setMapboxToken(data.token);
-      } catch (error) {
-        console.error('Error getting Mapbox token:', error);
+        let res = await fetch('/api/config/map-keys');
+        if (!res.ok) {
+          res = await fetch('http://localhost:5003/api/config/map-keys');
+        }
+        if (res.ok) {
+          const data = await res.json();
+          const fromServer = data.mapboxToken || '';
+          if (fromServer && !isPlaceholderToken(fromServer)) {
+            setMapboxToken(fromServer);
+          } else {
+            const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+            if (token && !isPlaceholderToken(token)) {
+              setMapboxToken(token);
+            } else {
+              setMapboxToken('');
+              setMapError('Mapbox not configured');
+            }
+          }
+        } else {
+          const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+          if (token && !isPlaceholderToken(token)) {
+            setMapboxToken(token);
+          } else {
+            setMapboxToken('');
+            setMapError('Mapbox not configured');
+          }
+        }
+      } catch {
+        const token = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+        if (token && !isPlaceholderToken(token)) {
+          setMapboxToken(token);
+        } else {
+          setMapboxToken('');
+          setMapError('Mapbox not configured');
+        }
       }
-    };
-    getMapboxToken();
+    })();
   }, []);
 
   // Fetch phone locations
@@ -54,24 +96,13 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
         
         for (const phone of phones) {
           try {
-            // Construct the correct edge function URL with the phone path
-            const functionUrl = `https://ebwbrjkqrsgumlwvhrhb.supabase.co/functions/v1/location-api/phone/${phone.phone_id}`;
-            
-            const response = await fetch(functionUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVid2JyamtxcnNndW1sd3ZocmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjg3MDUsImV4cCI6MjA2ODYwNDcwNX0.DdJjvA0S3rMMAqvxfLKMPhYo2fQkwRrHj1KFOKgmXOc`,
-                'Content-Type': 'application/json',
-              }
-            });
-            
+            const response = await fetch(`/api/locations/latest?phone_id=${phone.phone_id}`);
             if (response.ok) {
               const data = await response.json();
-              const locationData = data.location;
-              if (locationData && locationData.latitude && locationData.longitude) {
+              if (data && data.latitude && data.longitude) {
                 locations[phone.phone_id] = {
-                  lat: parseFloat(locationData.latitude),
-                  lng: parseFloat(locationData.longitude)
+                  lat: parseFloat(data.latitude),
+                  lng: parseFloat(data.longitude),
                 };
                 console.log(`Location found for phone ${phone.phone_id}:`, locations[phone.phone_id]);
               }
@@ -96,58 +127,64 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
     }
   }, [phones]);
 
-  // Real-time updates for new location data
+  // Poll for latest locations periodically (every 10s)
   useEffect(() => {
-    const channel = supabase
-      .channel('location-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'locations'
-        },
-        (payload) => {
-          console.log('New location received:', payload);
-          const newLocation = payload.new as any;
-          
-          if (newLocation.phone_id && newLocation.latitude && newLocation.longitude) {
-            setPhoneLocations(prev => ({
-              ...prev,
-              [newLocation.phone_id]: {
-                lat: parseFloat(newLocation.latitude),
-                lng: parseFloat(newLocation.longitude)
-              }
-            }));
+    const interval = setInterval(async () => {
+      const updates: {[phoneId: string]: {lat: number, lng: number}} = {};
+      for (const phone of phones) {
+        try {
+          const res = await fetch(`/api/locations/latest?phone_id=${phone.phone_id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.latitude && data.longitude) {
+              updates[phone.phone_id] = {
+                lat: parseFloat(data.latitude),
+                lng: parseFloat(data.longitude),
+              };
+            }
           }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+        } catch {}
+      }
+      if (Object.keys(updates).length > 0) {
+        setPhoneLocations(prev => ({ ...prev, ...updates }));
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [phones]);
 
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || !mapboxToken) return;
 
-    mapboxgl.accessToken = mapboxToken;
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [0, 0],
-      zoom: 10
-    });
+    try {
+      mapboxgl.accessToken = mapboxToken;
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [0, 0],
+        zoom: 10
+      });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.current.on('error', (e) => {
+        console.error('Mapbox GL error:', e);
+        setMapError('Mapbox not configured or token invalid');
+      });
+
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    } catch (e) {
+      console.error('Failed to initialize Mapbox:', e);
+      setMapError('Mapbox not configured or token invalid');
+    }
 
     return () => {
       map.current?.remove();
     };
   }, [mapboxToken]);
+
+  // Trigger map resize on layout changes (e.g., panels collapse/expand)
+  useEffect(() => {
+    try { map.current?.resize(); } catch {}
+  }, [resizeSignal]);
 
   // Add phone markers to map
   useEffect(() => {
@@ -434,8 +471,16 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
     return R * c; // Distance in kilometers
   };
 
-  if (!mapboxToken) {
-    return (
+  if (!mapboxToken || mapError) {
+    return fullScreen ? (
+      <div className="absolute inset-0 flex items-center justify-center bg-muted">
+        <div className="text-center">
+          <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">Mapbox not configured</h3>
+          <p className="text-sm text-muted-foreground">Add `VITE_MAPBOX_TOKEN` to `.env` or set it in Settings.</p>
+        </div>
+      </div>
+    ) : (
       <Card className="h-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -447,8 +492,8 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
           <div className="w-full h-96 bg-muted rounded-lg flex items-center justify-center">
             <div className="text-center">
               <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Loading Map...</h3>
-              <p className="text-sm text-muted-foreground">Getting Mapbox configuration</p>
+              <h3 className="text-lg font-semibold mb-2">Mapbox not configured</h3>
+              <p className="text-sm text-muted-foreground">Add `VITE_MAPBOX_TOKEN` to `.env` or set it in Settings.</p>
             </div>
           </div>
         </CardContent>
@@ -456,12 +501,16 @@ const MapView = ({ selectedPhone, phones, trackingData = {} }: MapViewProps) => 
     );
   }
   
+  if (fullScreen) {
+    return <div ref={mapContainer} className="absolute inset-0" />;
+  }
+
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MapPin className="h-5 w-5" />
-          Location Map
+          Location Map (Mapbox)
           {selectedPhone && (
             <Badge variant="outline">
               {selectedPhone.name}
