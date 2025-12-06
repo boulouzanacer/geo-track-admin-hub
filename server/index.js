@@ -740,7 +740,8 @@ app.get('/api/config/map-keys', async (_req, res) => {
       : (process.env.VITE_MAPBOX_TOKEN || '');
     const enableGoogleMaps = typeof cfg.enableGoogleMaps === 'boolean' ? cfg.enableGoogleMaps : true;
     const enableMapbox = typeof cfg.enableMapbox === 'boolean' ? cfg.enableMapbox : true;
-    res.json({ googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox });
+    const mapDefaultZoom = Number.isFinite(cfg.mapDefaultZoom) ? Number(cfg.mapDefaultZoom) : 10;
+    res.json({ googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error' });
   }
@@ -749,7 +750,7 @@ app.get('/api/config/map-keys', async (_req, res) => {
 // Admin: Write map keys
 app.post('/api/admin/config/map-keys', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const { googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox } = req.body || {};
+    const { googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom } = req.body || {};
 
     // Coerce possible string values to booleans for robustness
     const coerceBoolean = (val) => {
@@ -771,6 +772,10 @@ app.post('/api/admin/config/map-keys', authMiddleware, adminOnly, async (req, re
     const emb = coerceBoolean(enableMapbox);
     if (typeof egm === 'boolean') next.enableGoogleMaps = egm;
     if (typeof emb === 'boolean') next.enableMapbox = emb;
+    if (mapDefaultZoom != null) {
+      const z = Math.max(1, Math.min(20, Math.round(Number(mapDefaultZoom))));
+      if (Number.isFinite(z)) next.mapDefaultZoom = z;
+    }
 
     const ok = writeConfig(next);
     if (!ok) return res.status(500).json({ error: 'Failed to persist config' });
@@ -784,7 +789,8 @@ app.post('/api/admin/config/map-keys', authMiddleware, adminOnly, async (req, re
       : (process.env.VITE_MAPBOX_TOKEN || '');
     const enableGoogleMapsOut = typeof next.enableGoogleMaps === 'boolean' ? next.enableGoogleMaps : true;
     const enableMapboxOut = typeof next.enableMapbox === 'boolean' ? next.enableMapbox : true;
-    res.json({ success: true, config: { googleMapsKey: googleKeyOut, mapboxToken: mapboxTokenOut, enableGoogleMaps: enableGoogleMapsOut, enableMapbox: enableMapboxOut } });
+    const mapDefaultZoomOut = Number.isFinite(next.mapDefaultZoom) ? Number(next.mapDefaultZoom) : 10;
+    res.json({ success: true, config: { googleMapsKey: googleKeyOut, mapboxToken: mapboxTokenOut, enableGoogleMaps: enableGoogleMapsOut, enableMapbox: enableMapboxOut, mapDefaultZoom: mapDefaultZoomOut } });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error' });
   }

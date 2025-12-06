@@ -14,6 +14,7 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
   const [mapboxToken, setMapboxToken] = useState('');
   const [enableGoogleMaps, setEnableGoogleMaps] = useState(true);
   const [enableMapbox, setEnableMapbox] = useState(true);
+  const [mapDefaultZoom, setMapDefaultZoom] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -29,6 +30,8 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
         setMapboxToken(data.mapboxToken || '');
         setEnableGoogleMaps(typeof data.enableGoogleMaps === 'boolean' ? data.enableGoogleMaps : true);
         setEnableMapbox(typeof data.enableMapbox === 'boolean' ? data.enableMapbox : true);
+        const z = Number.isFinite(Number(data.mapDefaultZoom)) ? Math.round(Number(data.mapDefaultZoom)) : 10;
+        setMapDefaultZoom(Math.max(1, Math.min(20, z)));
       }
     } catch {}
   };
@@ -42,7 +45,7 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const payload = { googleMapsKey: googleKey, mapboxToken, enableGoogleMaps, enableMapbox };
+      const payload = { googleMapsKey: googleKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom };
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -129,6 +132,22 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
                   Rechargement...
                 </div>
               )}
+            </div>
+            <div className="space-y-2 pt-2">
+              <Label htmlFor="map-default-zoom">Zoom de la carte (1–20)</Label>
+              <Input
+                id="map-default-zoom"
+                type="number"
+                min={1}
+                max={20}
+                value={mapDefaultZoom}
+                onChange={(e) => {
+                  const val = Math.round(Number(e.target.value));
+                  if (!Number.isFinite(val)) return;
+                  setMapDefaultZoom(Math.max(1, Math.min(20, val)));
+                }}
+                disabled={loading || refreshing}
+              />
             </div>
           </form>
         </CardContent>
