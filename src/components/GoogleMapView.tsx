@@ -476,7 +476,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
       if (phones.filter(phone => phoneLocations[phone.phone_id]).length === 1) {
         const singleLocation = Object.values(phoneLocations)[0];
         map.current!.setCenter(new google.maps.LatLng(singleLocation.lat, singleLocation.lng));
-        map.current!.setZoom(10);
+        map.current!.setZoom(6);
       } else {
         map.current!.fitBounds(bounds);
       }
