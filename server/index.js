@@ -789,7 +789,7 @@ process.on('uncaughtException', (err) => {
 });
 
 // Prefer platform-provided PORT (e.g., cPanel Passenger, PaaS), then API_PORT
-const port = Number(process.env.PORT || process.env.API_PORT || 4000);
+const port = Number(process.env.PORT || process.env.API_PORT || 3000);
 // Bind explicitly to IPv4 to avoid localhost resolution quirks on Windows
 const host = '0.0.0.0';
 // Serve built frontend (SPA) from 'dist'
