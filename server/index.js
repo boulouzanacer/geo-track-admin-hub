@@ -66,14 +66,24 @@ function adminOnly(req, res, next) {
   next();
 }
 
-app.get('/api/health', async (_req, res) => {
+// --- API Routes FIRST ---
+app.get("/api/hello", (req, res) => {
+  res.json({ message: "Hello from server!" });
+});
+
+app.get('/api/health', async (_req, res) => { 
   try {
     const [rows] = await pool.query('SELECT 1 AS ok');
     res.json({ ok: true, rows });
   } catch (err) {
-    res.status(500).json({ ok: false, error: (err && err.message) || 'Unknown error' });
+    console.error('Database error:', err); // <-- Log full error
+    res.status(500).json({ 
+      ok: false, 
+      error: (err && err.message) || 'Unknown error' 
+    });
   }
 });
+
 
 // Lightweight readiness endpoint that does not touch the database
 app.get('/api/ready', (_req, res) => {
@@ -789,7 +799,7 @@ process.on('uncaughtException', (err) => {
 });
 
 // Prefer platform-provided PORT (e.g., cPanel Passenger, PaaS), then API_PORT
-const port = Number(process.env.PORT || process.env.API_PORT || 4000);
+const port = Number(process.env.PORT || process.env.API_PORT || 3000);
 // Bind explicitly to IPv4 to avoid localhost resolution quirks on Windows
 const host = '0.0.0.0';
 // Serve built frontend (SPA) from 'dist'

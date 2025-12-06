@@ -11,7 +11,11 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "seed:bons": "node server/seed/seed_bons.js"
+    "seed:bons": "node server/seed/seed_bons.js",
+    "start": "node server/index.js"
+  },
+  "engines": {
+  "node": "20.x"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^1.16.10",
