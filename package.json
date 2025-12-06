@@ -14,6 +14,9 @@
     "seed:bons": "node server/seed/seed_bons.js",
     "start": "node server/index.js"
   },
+  "engines": {
+  "node": "20.x"
+  },
   "dependencies": {
     "@googlemaps/js-api-loader": "^1.16.10",
     "@hookform/resolvers": "^3.9.0",
