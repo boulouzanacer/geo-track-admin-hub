@@ -66,6 +66,11 @@ function adminOnly(req, res, next) {
   next();
 }
 
+// --- API Routes FIRST ---
+app.get("/api/hello", (req, res) => {
+  res.json({ message: "Hello from server!" });
+});
+
 app.get('/api/health', async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 AS ok');
