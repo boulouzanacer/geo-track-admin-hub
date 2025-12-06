@@ -157,8 +157,13 @@ const Dashboard = () => {
     await signOut();
   };
 
-  // Derived phones by quick filter
-  const filteredPhones = (selectedUserId ? phones.filter(p => String(p.user_id) === String(selectedUserId)) : phones).filter(p => {
+  // Derived phones by ownership and quick filter
+  // Non-admin users should only see their own phones
+  const ownershipFiltered = (!userProfile || userProfile.role === 'admin')
+    ? (selectedUserId ? phones.filter(p => String(p.user_id) === String(selectedUserId)) : phones)
+    : phones.filter(p => String(p.user_id) === String(userProfile.id));
+
+  const filteredPhones = ownershipFiltered.filter(p => {
     const lastUpdate = new Date(p.last_update);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
@@ -201,7 +206,7 @@ const Dashboard = () => {
           fullScreen
           resizeSignal={resizeTick}
           selectedPhone={selectedPhone}
-          phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+          phones={filteredPhones}
           trackingData={{}}
         />
       ) : allowMapbox && mapboxToken ? (
@@ -209,7 +214,7 @@ const Dashboard = () => {
           fullScreen
           resizeSignal={resizeTick}
           selectedPhone={selectedPhone}
-          phones={selectedUserId ? phones.filter(phone => phone.user_id === selectedUserId) : phones}
+          phones={filteredPhones}
           trackingData={{}}
         />
       ) : allowGoogle && !googleKey && !allowMapbox ? (
