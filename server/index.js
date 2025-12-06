@@ -71,14 +71,19 @@ app.get("/api/hello", (req, res) => {
   res.json({ message: "Hello from server!" });
 });
 
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', async (_req, res) => { 
   try {
     const [rows] = await pool.query('SELECT 1 AS ok');
     res.json({ ok: true, rows });
   } catch (err) {
-    res.status(500).json({ ok: false, error: (err && err.message) || 'Unknown error' });
+    console.error('Database error:', err); // <-- Log full error
+    res.status(500).json({ 
+      ok: false, 
+      error: (err && err.message) || 'Unknown error' 
+    });
   }
 });
+
 
 // Lightweight readiness endpoint that does not touch the database
 app.get('/api/ready', (_req, res) => {
