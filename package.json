@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "seed:bons": "node server/seed/seed_bons.js"
+    "start": "node server/index.js"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^1.16.10",
