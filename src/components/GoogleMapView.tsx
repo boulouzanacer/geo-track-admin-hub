@@ -30,6 +30,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
+  const [mapDefaultZoom, setMapDefaultZoom] = useState<number>(10);
   const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number, timestamp?: string}}>({});
   const [loading, setLoading] = useState(true);
   const [trajectoryInfo, setTrajectoryInfo] = useState<{[phoneId: string]: {distance: number, duration: number, positions: number}}>({});
@@ -50,6 +51,8 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
         if (res.ok) {
           const data = await res.json();
           const fromServer = data.googleMapsKey || '';
+          const z = Number.isFinite(Number(data.mapDefaultZoom)) ? Math.round(Number(data.mapDefaultZoom)) : 10;
+          setMapDefaultZoom(Math.max(1, Math.min(20, z)));
           if (fromServer) {
             setGoogleMapsKey(fromServer);
           } else {
@@ -148,7 +151,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
       if (mapContainer.current) {
         map.current = new google.maps.Map(mapContainer.current, {
           center: { lat: 0, lng: 0 },
-          zoom: 10,
+          zoom: mapDefaultZoom,
           mapTypeControl: true,
           streetViewControl: true,
           fullscreenControl: true,
@@ -179,6 +182,18 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
       }
     };
   }, [googleMapsKey]);
+
+  // Adjust zoom if default changes after map initialization
+  useEffect(() => {
+    try {
+      if (map.current) {
+        const currentZoom = map.current.getZoom() ?? mapDefaultZoom;
+        if (!Number.isFinite(currentZoom) || Math.abs(currentZoom - mapDefaultZoom) > 0.1) {
+          map.current.setZoom(mapDefaultZoom);
+        }
+      }
+    } catch {}
+  }, [mapDefaultZoom]);
 
   // Capture Google Maps auth failures (e.g., invalid key, billing, referrer restrictions)
   useEffect(() => {
@@ -476,9 +491,18 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
       if (phones.filter(phone => phoneLocations[phone.phone_id]).length === 1) {
         const singleLocation = Object.values(phoneLocations)[0];
         map.current!.setCenter(new google.maps.LatLng(singleLocation.lat, singleLocation.lng));
-        map.current!.setZoom(6);
+        map.current!.setZoom(mapDefaultZoom);
       } else {
         map.current!.fitBounds(bounds);
+        // Cap zoom after bounds fit to avoid over-zooming
+        try {
+          google.maps.event.addListenerOnce(map.current!, 'idle', () => {
+            const z = map.current!.getZoom() ?? mapDefaultZoom;
+            if (Number.isFinite(z) && z > mapDefaultZoom) {
+              map.current!.setZoom(mapDefaultZoom);
+            }
+          });
+        } catch {}
       }
     }
   }, [phoneLocations, phones, selectedPhone, trackingData]);

@@ -34,6 +34,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
   const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number}}>({});
   const [loading, setLoading] = useState(true);
   const [trajectoryInfo, setTrajectoryInfo] = useState<{[phoneId: string]: {distance: number, duration: number, positions: number}}>({});
+  const [mapDefaultZoom, setMapDefaultZoom] = useState<number>(10);
 
   // Prefer backend config for token; fallback to env only if server returns empty
   const isPlaceholderToken = (t: string) => {
@@ -56,6 +57,8 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
         if (res.ok) {
           const data = await res.json();
           const fromServer = data.mapboxToken || '';
+          const z = Number.isFinite(Number(data.mapDefaultZoom)) ? Math.round(Number(data.mapDefaultZoom)) : 10;
+          setMapDefaultZoom(Math.max(1, Math.min(20, z)));
           if (fromServer && !isPlaceholderToken(fromServer)) {
             setMapboxToken(fromServer);
           } else {
@@ -162,7 +165,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [0, 0],
-        zoom: 10
+        zoom: mapDefaultZoom
       });
 
       map.current.on('error', (e) => {
@@ -180,6 +183,18 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
       map.current?.remove();
     };
   }, [mapboxToken]);
+
+  // Adjust zoom if default changes after map initialization
+  useEffect(() => {
+    try {
+      if (map.current) {
+        const currentZoom = map.current.getZoom();
+        if (!Number.isFinite(currentZoom) || Math.abs(currentZoom - mapDefaultZoom) > 0.1) {
+          map.current.setZoom(mapDefaultZoom);
+        }
+      }
+    } catch {}
+  }, [mapDefaultZoom]);
 
   // Trigger map resize on layout changes (e.g., panels collapse/expand)
   useEffect(() => {
@@ -435,10 +450,10 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
         // For single location, center with default zoom
         const singleLocation = Object.values(phoneLocations)[0];
         map.current.setCenter([singleLocation.lng, singleLocation.lat]);
-        map.current.setZoom(10);
+        map.current.setZoom(mapDefaultZoom);
       } else {
         // For multiple locations, fit bounds with minimum zoom
-        map.current.fitBounds(bounds, { padding: 50, maxZoom: 10 });
+        map.current.fitBounds(bounds, { padding: 50, maxZoom: mapDefaultZoom });
       }
     }
   }, [phoneLocations, phones, selectedPhone, trackingData]);
