@@ -603,6 +603,94 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
   }
 });
 
+// Phone auth endpoint
+// Reçoit: phone_id, device_name, email, username, password
+// Réponses:
+// - {code: 200, message: "Connecté"} si l'utilisateur existe, non désactivé et mot de passe valide
+// - {code: 330, message: "Utilisateur bloqué"} si l'utilisateur est désactivé
+// - {code: 340, message: "Utilisateur n'est pas encore inscrit"} si l'utilisateur n'existe pas
+// - {code: 401, message: "Identifiants invalides"} si le mot de passe est incorrect
+app.post('/api/phone-auth', async (req, res) => {
+  const { phone_id, device_name, email, username, password } = req.body || {};
+
+  // Validation minimale: au moins username ou email + password
+  if (!password || (!username && !email)) {
+    return res.status(200).json({ code: 400, message: 'username ou email et password requis' });
+  }
+
+  try {
+    const lookupField = username ? 'username' : 'email';
+    const lookupValue = username || email;
+    const [rows] = await pool.query(`SELECT * FROM clients WHERE ${lookupField} = ? LIMIT 1`, [lookupValue]);
+    const client = rows[0];
+
+    if (!client) {
+      return res.status(200).json({ code: 340, message: "Utilisateur n'est pas encore inscrit" });
+    }
+
+    // Vérifier le statut
+    if (client.statut && String(client.statut).toLowerCase() === 'disabled') {
+      return res.status(200).json({ code: 330, message: 'Utilisateur bloqué' });
+    }
+
+    // Vérifier le mot de passe (bcrypt si hashé, sinon en clair)
+    const stored = client.password || '';
+    const looksHashed = typeof stored === 'string' && stored.startsWith('$2');
+    let ok = false;
+    if (looksHashed) {
+      try {
+        ok = await bcrypt.compare(password, stored);
+      } catch (_) {
+        ok = false;
+      }
+    } else {
+      ok = password === stored;
+    }
+
+    if (!ok) {
+      return res.status(200).json({ code: 401, message: 'Identifiants invalides' });
+    }
+
+    // Enregistrer la dernière connexion
+    try {
+      await pool.query('UPDATE clients SET last_login = NOW() WHERE client_id = ?', [client.client_id ?? client.id]);
+    } catch (_) {}
+
+    // Auto-enregistrer le téléphone si première connexion et phone_id encore absent
+    try {
+      const cid = client.client_id ?? client.id;
+      if (phone_id && cid) {
+        const [prows] = await pool.query('SELECT phone_id, phone_name, client_id FROM phones WHERE phone_id = ? LIMIT 1', [phone_id]);
+        const exists = Array.isArray(prows) && prows.length > 0;
+        const deviceNameTrimmed = device_name && String(device_name).trim().length > 0 ? String(device_name).trim() : null;
+        if (!exists) {
+          const phoneName = deviceNameTrimmed || String(phone_id);
+          await pool.query(
+            'INSERT INTO phones (phone_id, phone_name, client_id, last_update) VALUES (?, ?, ?, NOW())',
+            [phone_id, phoneName, cid]
+          );
+        } else {
+          const current = prows[0];
+          if (deviceNameTrimmed && String(current.client_id) === String(cid) && deviceNameTrimmed !== current.phone_name) {
+            await pool.query(
+              'UPDATE phones SET phone_name = ?, last_update = NOW() WHERE phone_id = ?',
+              [deviceNameTrimmed, phone_id]
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // Ignorer les erreurs de modification pour ne pas bloquer l'auth
+    }
+
+    // Optionnel: capturer phone_id/device_name à des fins de logs (non demandé de créer/lier téléphone)
+    // On renvoie simplement la réussite d'authentification
+    return res.status(200).json({ code: 200, message: 'Connecté' });
+  } catch (err) {
+    return res.status(500).json({ error: (err && err.message) || 'Unknown error' });
+  }
+});
+
 // Dev-only: Bootstrap an admin user if none exists
 app.post('/api/dev/bootstrap-admin', async (req, res) => {
   try {
