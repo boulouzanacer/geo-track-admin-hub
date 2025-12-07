@@ -15,6 +15,7 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
   const [enableGoogleMaps, setEnableGoogleMaps] = useState(true);
   const [enableMapbox, setEnableMapbox] = useState(true);
   const [mapDefaultZoom, setMapDefaultZoom] = useState<number>(10);
+  const [bonCumulate, setBonCumulate] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,12 +33,20 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
         setEnableMapbox(typeof data.enableMapbox === 'boolean' ? data.enableMapbox : true);
         const z = Number.isFinite(Number(data.mapDefaultZoom)) ? Math.round(Number(data.mapDefaultZoom)) : 10;
         setMapDefaultZoom(Math.max(1, Math.min(20, z)));
+        setBonCumulate(typeof data.bonCumulate === 'boolean' ? data.bonCumulate : false);
       }
     } catch {}
   };
 
   useEffect(() => {
-    refreshFromServer();
+    (async () => {
+      setRefreshing(true);
+      try {
+        await refreshFromServer();
+      } finally {
+        setRefreshing(false);
+      }
+    })();
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -45,6 +54,8 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
+      // IMPORTANT: do NOT include bonCumulate in bulk save to avoid overwriting
+      // It is persisted via the dedicated toggle handler (saveBonCumulate)
       const payload = { googleMapsKey: googleKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom };
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -79,6 +90,57 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
       toast({ title: 'Erreur', description: err?.message || 'Échec de la sauvegarde', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Save only bonCumulate when toggle changes, to avoid surprises after refresh
+  const saveBonCumulate = async (value: boolean) => {
+    // Optimistic update to avoid flicker
+    setBonCumulate(value);
+    setRefreshing(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      // Persist just the changed flag
+      let res: Response | null = null;
+      try {
+        res = await fetch('/api/admin/config/map-keys', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ bonCumulate: value }),
+        });
+      } catch (_) {
+        res = null;
+      }
+      if (!res || !res.ok) {
+        const res2 = await fetch('http://localhost:5003/api/admin/config/map-keys', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ bonCumulate: value }),
+        });
+        if (!res2.ok) throw new Error(`Save failed (${res2.status})`);
+        // Prefer value returned by API if provided
+        let body2: any = null;
+        try { body2 = await res2.json(); } catch { body2 = null; }
+        const persisted2 = (body2 && body2.config && typeof body2.config.bonCumulate === 'boolean') ? body2.config.bonCumulate : value;
+        setBonCumulate(persisted2);
+      } else {
+        // Prefer value returned by API if provided
+        let body: any = null;
+        try { body = await res.json(); } catch { body = null; }
+        const persisted = (body && body.config && typeof body.config.bonCumulate === 'boolean') ? body.config.bonCumulate : value;
+        setBonCumulate(persisted);
+      }
+      toast({ title: 'Succès', description: 'Paramètre cumuler/supprimer enregistré.' });
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err?.message || 'Échec de la sauvegarde du paramètre', variant: 'destructive' });
+      // Roll back optimistic update only if we know it failed
+      setBonCumulate((prev) => prev); // keep current state
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -148,6 +210,23 @@ export const SettingsPanel = ({ onSaved }: { onSaved?: () => void }) => {
                 }}
                 disabled={loading || refreshing}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bon-cumulate">Cumuler les bon ?</Label>
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="bon-cumulate"
+                  checked={bonCumulate}
+                  onCheckedChange={saveBonCumulate}
+                  disabled={loading || refreshing}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {bonCumulate ? 'Cumuler les bons (ne pas supprimer)' : 'Réinitialiser: supprimer les anciens'}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Activer pour conserver les anciens bons lors des synchronisations. Désactiver pour supprimer les anciens bons avant d’ajouter les nouveaux.
+              </p>
             </div>
           </form>
         </CardContent>
