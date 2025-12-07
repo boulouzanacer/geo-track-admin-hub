@@ -39,9 +39,13 @@ export const UserPhoneActions = ({ phone, onUpdate }: UserPhoneActionsProps) => 
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('auth_token');
       const res = await fetch(`/api/phones/${phone.phone_id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ name: phoneName.trim() }),
       });
       if (!res.ok) {
@@ -71,7 +75,11 @@ export const UserPhoneActions = ({ phone, onUpdate }: UserPhoneActionsProps) => 
   const handleDeletePhone = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/phones/${phone.phone_id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/phones/${phone.phone_id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || 'Failed to delete phone');

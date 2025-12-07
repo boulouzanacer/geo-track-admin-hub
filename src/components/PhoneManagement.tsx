@@ -48,7 +48,10 @@ export const PhoneManagement = () => {
 
   const fetchPhones = async () => {
     try {
-      const res = await fetch('/api/phones');
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/phones', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) throw new Error('Failed to fetch phones');
       const data = await res.json();
       setPhones(Array.isArray(data) ? data : []);
@@ -84,9 +87,13 @@ export const PhoneManagement = () => {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem('auth_token');
       const res = await fetch('/api/phones', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           phone_id: formData.phone_id,
           name: formData.name,
@@ -121,7 +128,11 @@ export const PhoneManagement = () => {
     if (!confirm('Are you sure you want to delete this phone?')) return;
 
     try {
-      const res = await fetch(`/api/phones/${phoneId}`, { method: 'DELETE' });
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/phones/${phoneId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || 'Failed to delete phone');

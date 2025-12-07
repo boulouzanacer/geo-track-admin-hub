@@ -106,19 +106,36 @@ app.get('/api/users', async (_req, res) => {
 });
 
 // Phones listing endpoint with joined client username, mapped to UI fields
-app.get('/api/phones', async (_req, res) => {
+app.get('/api/phones', authMiddleware, async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT p.phone_id AS id,
-              p.phone_id,
-              p.phone_name AS name,
-              p.client_id AS user_id,
-              p.last_update,
-              c.username AS user_name
-         FROM phones p
-         LEFT JOIN clients c ON c.client_id = p.client_id
-         ORDER BY p.last_update DESC`
-    );
+    const isAdmin = !!req.user?.is_admin;
+    const currentClientId = req.user?.client_id;
+    const requestedUserId = req.query.user_id ? String(req.query.user_id) : null;
+
+    // Build base query and params depending on role
+    let sql = `SELECT p.phone_id AS id,
+                      p.phone_id,
+                      p.phone_name AS name,
+                      p.client_id AS user_id,
+                      p.last_update,
+                      c.username AS user_name
+                 FROM phones p
+                 LEFT JOIN clients c ON c.client_id = p.client_id`;
+    const params = [];
+
+    if (isAdmin) {
+      if (requestedUserId) {
+        sql += ` WHERE p.client_id = ?`;
+        params.push(requestedUserId);
+      }
+    } else {
+      sql += ` WHERE p.client_id = ?`;
+      params.push(currentClientId);
+    }
+
+    sql += ` ORDER BY p.last_update DESC`;
+
+    const [rows] = await pool.query(sql, params);
     const mapped = rows.map((r) => ({
       id: r.id,
       phone_id: r.phone_id,
@@ -134,7 +151,7 @@ app.get('/api/phones', async (_req, res) => {
 });
 
 // Create phone
-app.post('/api/phones', async (req, res) => {
+app.post('/api/phones', authMiddleware, adminOnly, async (req, res) => {
   const { phone_id, name, user_id } = req.body || {};
   if (!phone_id || !name || !user_id) {
     return res.status(400).json({ error: 'phone_id, name, user_id are required' });
@@ -151,11 +168,21 @@ app.post('/api/phones', async (req, res) => {
 });
 
 // Update phone name
-app.put('/api/phones/:id', async (req, res) => {
+app.put('/api/phones/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { name } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   try {
+    // Owner or admin check
+    const [rows] = await pool.query('SELECT client_id FROM phones WHERE phone_id = ? LIMIT 1', [id]);
+    const row = rows[0];
+    const isAdmin = !!req.user?.is_admin;
+    const currentClientId = req.user?.client_id;
+    if (!row) return res.status(404).json({ error: 'Phone not found' });
+    if (!isAdmin && String(row.client_id) !== String(currentClientId)) {
+      return res.status(403).json({ error: 'Forbidden: cannot modify another user’s phone' });
+    }
+
     const [result] = await pool.query('UPDATE phones SET phone_name = ? WHERE phone_id = ?', [name, id]);
     res.json({ success: true, affectedRows: result.affectedRows });
   } catch (err) {
@@ -164,9 +191,19 @@ app.put('/api/phones/:id', async (req, res) => {
 });
 
 // Delete phone
-app.delete('/api/phones/:id', async (req, res) => {
+app.delete('/api/phones/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   try {
+    // Owner or admin check
+    const [rows] = await pool.query('SELECT client_id FROM phones WHERE phone_id = ? LIMIT 1', [id]);
+    const row = rows[0];
+    const isAdmin = !!req.user?.is_admin;
+    const currentClientId = req.user?.client_id;
+    if (!row) return res.status(404).json({ error: 'Phone not found' });
+    if (!isAdmin && String(row.client_id) !== String(currentClientId)) {
+      return res.status(403).json({ error: 'Forbidden: cannot delete another user’s phone' });
+    }
+
     await pool.query('DELETE FROM locations WHERE phone_id = ?', [id]);
     const [result] = await pool.query('DELETE FROM phones WHERE phone_id = ?', [id]);
     res.json({ success: true, affectedRows: result.affectedRows });

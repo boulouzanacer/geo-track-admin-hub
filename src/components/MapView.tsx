@@ -24,9 +24,10 @@ interface MapViewProps {
   trackingData?: any;
   fullScreen?: boolean;
   resizeSignal?: number;
+  pollingEnabled?: boolean;
 }
 
-const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal }: MapViewProps) => {
+const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal, pollingEnabled = true }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
@@ -130,8 +131,9 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
     }
   }, [phones]);
 
-  // Poll for latest locations periodically (every 10s)
+  // Poll for latest locations periodically (every 10s) when pollingEnabled
   useEffect(() => {
+    if (!pollingEnabled || phones.length === 0) return;
     const interval = setInterval(async () => {
       const updates: {[phoneId: string]: {lat: number, lng: number}} = {};
       for (const phone of phones) {
@@ -153,7 +155,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [phones]);
+  }, [phones, pollingEnabled]);
 
   // Initialize map
   useEffect(() => {

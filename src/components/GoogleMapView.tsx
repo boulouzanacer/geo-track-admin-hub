@@ -24,9 +24,10 @@ interface GoogleMapViewProps {
   trackingData?: any;
   fullScreen?: boolean;
   resizeSignal?: number;
+  pollingEnabled?: boolean;
 }
 
-const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal }: GoogleMapViewProps) => {
+const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal, pollingEnabled = true }: GoogleMapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
@@ -111,8 +112,9 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
     }
   }, [phones]);
 
-  // Poll for latest locations periodically (every 10s)
+  // Poll for latest locations periodically (every 10s) when pollingEnabled
   useEffect(() => {
+    if (!pollingEnabled || phones.length === 0) return;
     const interval = setInterval(async () => {
       const updates: {[phoneId: string]: {lat: number, lng: number, timestamp?: string}} = {};
       for (const phone of phones) {
@@ -135,7 +137,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [phones]);
+  }, [phones, pollingEnabled]);
 
   // Initialize Google Maps
   useEffect(() => {

@@ -96,7 +96,10 @@ const Dashboard = () => {
   const fetchPhones = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/phones');
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/phones', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) throw new Error('Failed to fetch phones');
       const data = await res.json();
       setPhones(Array.isArray(data) ? data : []);
@@ -187,6 +190,10 @@ const Dashboard = () => {
   const allowGoogle = mapConfig.enableGoogleMaps !== false;
   const allowMapbox = mapConfig.enableMapbox !== false;
 
+  // Auto-tracking logic: when tracking for selected phone is ON, show only that phone
+  const isTrackingSelected = !!(selectedPhone && trackingEnabled[selectedPhone.phone_id]);
+  const mapPhones = isTrackingSelected && selectedPhone ? [selectedPhone] : filteredPhones;
+
   if (!userProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -206,7 +213,8 @@ const Dashboard = () => {
           fullScreen
           resizeSignal={resizeTick}
           selectedPhone={selectedPhone}
-          phones={filteredPhones}
+          phones={mapPhones}
+          pollingEnabled={isTrackingSelected}
           trackingData={{}}
         />
       ) : allowMapbox && mapboxToken ? (
@@ -214,7 +222,8 @@ const Dashboard = () => {
           fullScreen
           resizeSignal={resizeTick}
           selectedPhone={selectedPhone}
-          phones={filteredPhones}
+          phones={mapPhones}
+          pollingEnabled={isTrackingSelected}
           trackingData={{}}
         />
       ) : allowGoogle && !googleKey && !allowMapbox ? (
