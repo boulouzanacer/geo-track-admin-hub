@@ -25,9 +25,10 @@ interface GoogleMapViewProps {
   fullScreen?: boolean;
   resizeSignal?: number;
   pollingEnabled?: boolean;
+  onLocationUpdate?: (phoneId: string, location: { lat: number; lng: number; timestamp?: string }) => void;
 }
 
-const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal, pollingEnabled = true }: GoogleMapViewProps) => {
+const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal, pollingEnabled = true, onLocationUpdate }: GoogleMapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const [googleMapsKey, setGoogleMapsKey] = useState<string>('');
@@ -100,6 +101,12 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
         }
         
         setPhoneLocations(locations);
+        // Notify parent of fetched locations (initial baseline)
+        try {
+          Object.entries(locations).forEach(([pid, loc]) => {
+            onLocationUpdate?.(pid, loc);
+          });
+        } catch {}
         setLoading(false);
       } catch (error) {
         console.error('Error fetching phone locations:', error);
@@ -134,6 +141,12 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
       }
       if (Object.keys(updates).length > 0) {
         setPhoneLocations(prev => ({ ...prev, ...updates }));
+        // Notify parent for each updated location
+        try {
+          Object.entries(updates).forEach(([pid, loc]) => {
+            onLocationUpdate?.(pid, loc);
+          });
+        } catch {}
       }
     }, 10000);
     return () => clearInterval(interval);

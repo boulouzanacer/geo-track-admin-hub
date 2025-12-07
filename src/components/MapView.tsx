@@ -25,14 +25,15 @@ interface MapViewProps {
   fullScreen?: boolean;
   resizeSignal?: number;
   pollingEnabled?: boolean;
+  onLocationUpdate?: (phoneId: string, location: { lat: number; lng: number; timestamp?: string }) => void;
 }
 
-const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal, pollingEnabled = true }: MapViewProps) => {
+const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false, resizeSignal, pollingEnabled = true, onLocationUpdate }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [mapError, setMapError] = useState<string | null>(null);
-  const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number}}>({});
+  const [phoneLocations, setPhoneLocations] = useState<{[phoneId: string]: {lat: number, lng: number, timestamp?: string}}>({});
   const [loading, setLoading] = useState(true);
   const [trajectoryInfo, setTrajectoryInfo] = useState<{[phoneId: string]: {distance: number, duration: number, positions: number}}>({});
   const [mapDefaultZoom, setMapDefaultZoom] = useState<number>(10);
@@ -96,7 +97,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
   useEffect(() => {
     const fetchPhoneLocations = async () => {
       try {
-        const locations: {[phoneId: string]: {lat: number, lng: number}} = {};
+        const locations: {[phoneId: string]: {lat: number, lng: number, timestamp?: string}} = {};
         
         for (const phone of phones) {
           try {
@@ -107,6 +108,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
                 locations[phone.phone_id] = {
                   lat: parseFloat(data.latitude),
                   lng: parseFloat(data.longitude),
+                  timestamp: data.timestamp,
                 };
                 console.log(`Location found for phone ${phone.phone_id}:`, locations[phone.phone_id]);
               }
@@ -119,6 +121,12 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
         }
         
         setPhoneLocations(locations);
+        // Notify parent of fetched locations (initial baseline)
+        try {
+          Object.entries(locations).forEach(([pid, loc]) => {
+            onLocationUpdate?.(pid, loc);
+          });
+        } catch {}
         setLoading(false);
       } catch (error) {
         console.error('Error fetching phone locations:', error);
@@ -135,7 +143,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
   useEffect(() => {
     if (!pollingEnabled || phones.length === 0) return;
     const interval = setInterval(async () => {
-      const updates: {[phoneId: string]: {lat: number, lng: number}} = {};
+      const updates: {[phoneId: string]: {lat: number, lng: number, timestamp?: string}} = {};
       for (const phone of phones) {
         try {
           const res = await fetch(`/api/locations/latest?phone_id=${phone.phone_id}`);
@@ -145,6 +153,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
               updates[phone.phone_id] = {
                 lat: parseFloat(data.latitude),
                 lng: parseFloat(data.longitude),
+                timestamp: data.timestamp,
               };
             }
           }
@@ -152,6 +161,12 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
       }
       if (Object.keys(updates).length > 0) {
         setPhoneLocations(prev => ({ ...prev, ...updates }));
+        // Notify parent for each updated location
+        try {
+          Object.entries(updates).forEach(([pid, loc]) => {
+            onLocationUpdate?.(pid, loc);
+          });
+        } catch {}
       }
     }, 10000);
     return () => clearInterval(interval);

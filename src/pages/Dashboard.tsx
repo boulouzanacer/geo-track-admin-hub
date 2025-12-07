@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -62,6 +62,7 @@ const Dashboard = () => {
   const [bonLoading, setBonLoading] = useState(false);
   const [selectedBonNum, setSelectedBonNum] = useState<string | null>(null);
   const [bonDetails, setBonDetails] = useState<{ header: any | null; items: any[] } | null>(null);
+  const lastLocationTsRef = useRef<Record<string, string | undefined>>({});
 
   const fetchMapConfig = async () => {
     try {
@@ -155,6 +156,27 @@ const Dashboard = () => {
     }
   };
 
+  // When auto-tracking is ON and device details are open, refresh BON list
+  const handleLocationUpdate = (phoneId: string, loc: { lat: number; lng: number; timestamp?: string }) => {
+    try {
+      if (!selectedPhone || phoneId !== selectedPhone.phone_id) return;
+      if (!drawerOpen) return;
+      if (!trackingEnabled[selectedPhone.phone_id]) return;
+      if (!bonType) return;
+      // Only refresh when timestamp changes to avoid redundant fetches
+      const prevTs = lastLocationTsRef.current[phoneId];
+      const currTs = loc.timestamp;
+      if (prevTs && currTs && prevTs === currTs) return;
+      lastLocationTsRef.current[phoneId] = currTs;
+      // Refresh list or details depending on current view
+      if (!selectedBonNum) {
+        fetchBonList(bonType, selectedPhone.phone_id);
+      } else {
+        fetchBonDetails(bonType, selectedBonNum);
+      }
+    } catch {}
+  };
+
 
   const handleSignOut = async () => {
     await signOut();
@@ -216,6 +238,7 @@ const Dashboard = () => {
           phones={mapPhones}
           pollingEnabled={isTrackingSelected}
           trackingData={{}}
+          onLocationUpdate={handleLocationUpdate}
         />
       ) : allowMapbox && mapboxToken ? (
         <MapView
@@ -225,6 +248,7 @@ const Dashboard = () => {
           phones={mapPhones}
           pollingEnabled={isTrackingSelected}
           trackingData={{}}
+          onLocationUpdate={handleLocationUpdate}
         />
       ) : allowGoogle && !googleKey && !allowMapbox ? (
         // Google only enabled but key missing -> show helper
