@@ -348,12 +348,12 @@ app.post('/api/bon/sync', async (req, res) => {
       clientId = ins.insertId;
     }
 
-    // Ensure phone exists
+    // Ensure phone exists (ne pas écraser phone_name ni client_id si déjà présent)
     const phoneName = device.name || device.device_name || 'Device';
     await conn.query(
       `INSERT INTO phones (phone_id, phone_name, client_id, last_update)
        VALUES (?, ?, ?, NOW())
-       ON DUPLICATE KEY UPDATE phone_name = VALUES(phone_name), client_id = VALUES(client_id), last_update = NOW()`,
+       ON DUPLICATE KEY UPDATE last_update = NOW()`,
       [device_id, phoneName, clientId]
     );
 
@@ -657,8 +657,10 @@ app.post('/api/phone-auth', async (req, res) => {
     } catch (_) {}
 
     // Auto-enregistrer le téléphone si première connexion et phone_id encore absent
+    // Si le téléphone existe mais appartient à un autre client, ne rien faire et renvoyer code 360
     try {
       const cid = client.client_id ?? client.id;
+      let phoneConflictOtherOwner = false;
       if (phone_id && cid) {
         const [prows] = await pool.query('SELECT phone_id, phone_name, client_id FROM phones WHERE phone_id = ? LIMIT 1', [phone_id]);
         const exists = Array.isArray(prows) && prows.length > 0;
@@ -671,13 +673,18 @@ app.post('/api/phone-auth', async (req, res) => {
           );
         } else {
           const current = prows[0];
-          if (deviceNameTrimmed && String(current.client_id) === String(cid) && deviceNameTrimmed !== current.phone_name) {
+          if (String(current.client_id) !== String(cid)) {
+            phoneConflictOtherOwner = true;
+          } else if (deviceNameTrimmed && deviceNameTrimmed !== current.phone_name) {
             await pool.query(
               'UPDATE phones SET phone_name = ?, last_update = NOW() WHERE phone_id = ?',
               [deviceNameTrimmed, phone_id]
             );
           }
         }
+      }
+      if (phoneConflictOtherOwner) {
+        return res.status(200).json({ code: 360, message: 'Téléphone enregistrer a un autre compte' });
       }
     } catch (e) {
       // Ignorer les erreurs de modification pour ne pas bloquer l'auth
