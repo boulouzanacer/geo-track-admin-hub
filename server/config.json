@@ -2,5 +2,7 @@
   "googleMapsKey": "AIzaSyApHcITtdXKD0hGcZhcN1MppH3pCyoqJ1s",
   "mapboxToken": "pk.eyJ1IjoiYm91bG91emEiLCJhIjoiY21ka2N2cW9wMHBndTJ0cXlrZHBuc2plMyJ9.XVJyTpUKILfrDo6cR1Rn9w",
   "enableGoogleMaps": true,
-  "enableMapbox": false
+  "enableMapbox": false,
+  "mapDefaultZoom": 10,
+  "bonCumulate": true
 }

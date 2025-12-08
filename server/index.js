@@ -337,6 +337,10 @@ app.post('/api/bon/sync', async (req, res) => {
   try {
     await conn.beginTransaction();
 
+    // Read config to decide cumulate vs reset strategy
+    const cfg = readConfig();
+    const bonCumulate = typeof cfg.bonCumulate === 'boolean' ? cfg.bonCumulate : false;
+
     // Ensure a client exists for device syncing (placeholder client)
     const [clientRows] = await conn.query('SELECT client_id FROM clients WHERE username = ? LIMIT 1', ['device_sync']);
     let clientId = clientRows && clientRows[0] && clientRows[0].client_id ? Number(clientRows[0].client_id) : null;
@@ -364,6 +368,14 @@ app.post('/api/bon/sync', async (req, res) => {
         'INSERT INTO locations (phone_id, latitude, longitude, date_time) VALUES (?, ?, ?, ?)',
         [device_id, Number(device.latitude), Number(device.longitude), ts]
       );
+    }
+
+    // Optionally reset existing BON data for this phone before inserting new JSON
+    // When bonCumulate=false, perform a full reset; otherwise, keep existing data
+    if (!bonCumulate) {
+      // Deleting BON1/BON1_TEMP will cascade to BON2/BON2_TEMP respectively
+      await conn.query('DELETE FROM BON1 WHERE phone_id = ?', [device_id]);
+      await conn.query('DELETE FROM BON1_TEMP WHERE phone_id = ?', [device_id]);
     }
 
     let updatedBon1 = 0;
@@ -873,7 +885,8 @@ app.get('/api/config/map-keys', async (_req, res) => {
     const enableGoogleMaps = typeof cfg.enableGoogleMaps === 'boolean' ? cfg.enableGoogleMaps : true;
     const enableMapbox = typeof cfg.enableMapbox === 'boolean' ? cfg.enableMapbox : true;
     const mapDefaultZoom = Number.isFinite(cfg.mapDefaultZoom) ? Number(cfg.mapDefaultZoom) : 10;
-    res.json({ googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom });
+    const bonCumulate = typeof cfg.bonCumulate === 'boolean' ? cfg.bonCumulate : false;
+    res.json({ googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom, bonCumulate });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error' });
   }
@@ -882,7 +895,7 @@ app.get('/api/config/map-keys', async (_req, res) => {
 // Admin: Write map keys
 app.post('/api/admin/config/map-keys', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const { googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom } = req.body || {};
+    const { googleMapsKey, mapboxToken, enableGoogleMaps, enableMapbox, mapDefaultZoom, bonCumulate } = req.body || {};
 
     // Coerce possible string values to booleans for robustness
     const coerceBoolean = (val) => {
@@ -908,6 +921,8 @@ app.post('/api/admin/config/map-keys', authMiddleware, adminOnly, async (req, re
       const z = Math.max(1, Math.min(20, Math.round(Number(mapDefaultZoom))));
       if (Number.isFinite(z)) next.mapDefaultZoom = z;
     }
+    const bc = coerceBoolean(bonCumulate);
+    if (typeof bc === 'boolean') next.bonCumulate = bc;
 
     const ok = writeConfig(next);
     if (!ok) return res.status(500).json({ error: 'Failed to persist config' });
@@ -922,7 +937,8 @@ app.post('/api/admin/config/map-keys', authMiddleware, adminOnly, async (req, re
     const enableGoogleMapsOut = typeof next.enableGoogleMaps === 'boolean' ? next.enableGoogleMaps : true;
     const enableMapboxOut = typeof next.enableMapbox === 'boolean' ? next.enableMapbox : true;
     const mapDefaultZoomOut = Number.isFinite(next.mapDefaultZoom) ? Number(next.mapDefaultZoom) : 10;
-    res.json({ success: true, config: { googleMapsKey: googleKeyOut, mapboxToken: mapboxTokenOut, enableGoogleMaps: enableGoogleMapsOut, enableMapbox: enableMapboxOut, mapDefaultZoom: mapDefaultZoomOut } });
+    const bonCumulateOut = typeof next.bonCumulate === 'boolean' ? next.bonCumulate : false;
+    res.json({ success: true, config: { googleMapsKey: googleKeyOut, mapboxToken: mapboxTokenOut, enableGoogleMaps: enableGoogleMapsOut, enableMapbox: enableMapboxOut, mapDefaultZoom: mapDefaultZoomOut, bonCumulate: bonCumulateOut } });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error' });
   }
