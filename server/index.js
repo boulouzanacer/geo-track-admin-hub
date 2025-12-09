@@ -204,9 +204,21 @@ app.delete('/api/phones/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden: cannot delete another user’s phone' });
     }
 
-    await pool.query('DELETE FROM locations WHERE phone_id = ?', [id]);
-    const [result] = await pool.query('DELETE FROM phones WHERE phone_id = ?', [id]);
-    res.json({ success: true, affectedRows: result.affectedRows });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query('DELETE FROM BON1_TEMP WHERE phone_id = ?', [id]);
+      await conn.query('DELETE FROM BON1 WHERE phone_id = ?', [id]);
+      await conn.query('DELETE FROM locations WHERE phone_id = ?', [id]);
+      const [result] = await conn.query('DELETE FROM phones WHERE phone_id = ?', [id]);
+      await conn.commit();
+      res.json({ success: true, affectedRows: result.affectedRows });
+    } catch (e) {
+      try { await conn.rollback(); } catch (_) {}
+      throw e;
+    } finally {
+      try { conn.release(); } catch (_) {}
+    }
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Unknown error' });
   }
