@@ -36,7 +36,8 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              <Route path="/" element={<Index />} />
+              {/* Rediriger la racine vers /auth */}
+              <Route path="/" element={<Navigate to="/auth" replace />} />
               <Route path="/auth" element={<Auth />} />
               <Route 
                 path="/dashboard" 
@@ -46,7 +47,7 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              {/* Route /settings is deprecated; redirect to /dashboard to avoid duplication */}
+              {/* Route /settings est dépréciée */}
               <Route path="/settings" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
