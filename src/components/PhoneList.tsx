@@ -98,9 +98,16 @@ const PhoneList = ({
     setRefreshing(false);
   };
 
+  // Helper: normalize timestamps to GMT+1 for display/logic
+  const toGmtPlus1 = (input: string | Date | undefined | null) => {
+    if (!input) return undefined as unknown as Date;
+    const d = new Date(input);
+    return new Date(d.getTime() + 60 * 60 * 1000);
+  };
+
   const getStatusColor = (phone: Phone) => {
     const timestamp = phoneTimestamps[phone.phone_id] || phone.last_update;
-    const lastUpdateTime = new Date(timestamp);
+    const lastUpdateTime = toGmtPlus1(timestamp);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastUpdateTime.getTime()) / (1000 * 60);
     
@@ -115,7 +122,7 @@ const PhoneList = ({
 
   const getStatusText = (phone: Phone) => {
     const timestamp = phoneTimestamps[phone.phone_id] || phone.last_update;
-    const diffMinutes = (new Date().getTime() - new Date(timestamp).getTime()) / (1000 * 60);
+    const diffMinutes = (new Date().getTime() - toGmtPlus1(timestamp).getTime()) / (1000 * 60);
     if (diffMinutes < 5) return 'Online';
     if (diffMinutes < 30) return 'Recent';
     return 'Offline';
@@ -195,7 +202,7 @@ const PhoneList = ({
                 <div className="flex items-center gap-1">
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(getDisplayTimestamp(phone)), { addSuffix: true })}
+                    {formatDistanceToNow(toGmtPlus1(getDisplayTimestamp(phone)), { addSuffix: true })}
                   </span>
                 </div>
                 

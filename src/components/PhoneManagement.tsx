@@ -295,7 +295,11 @@ export const PhoneManagement = () => {
                   </p>
                   {phone.last_update && (
                     <p className="text-xs text-muted-foreground">
-                      Last update: {new Date(phone.last_update).toLocaleString()}
+                      {(() => {
+                        const d = new Date(phone.last_update);
+                        const gmtPlus1 = new Date(d.getTime() + 60 * 60 * 1000);
+                        return `Last update: ${gmtPlus1.toLocaleString()}`;
+                      })()}
                     </p>
                   )}
                 </div>

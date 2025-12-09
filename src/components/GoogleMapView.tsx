@@ -42,6 +42,14 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
   const clustererRef = useRef<any>(null);
   const [gmError, setGmError] = useState<string | null>(null);
 
+  // Helper: normalize timestamps to GMT+1 for display
+  const toGmtPlus1 = (input: string | Date | undefined | null) => {
+    if (!input) return undefined as unknown as Date;
+    const d = new Date(input);
+    // Adjust by +1 hour to display in GMT+1
+    return new Date(d.getTime() + 60 * 60 * 1000);
+  };
+
   // Prefer backend config for API key; fallback to env only if server returns empty
   useEffect(() => {
     (async () => {
@@ -277,7 +285,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
             <div class="p-2">
               <h4 class="font-semibold">${phone.name}</h4>
               <p class="text-sm text-gray-600">ID: ${phone.phone_id}</p>
-              <p class="text-sm text-gray-600">Last update: ${location.timestamp ? formatDistanceToNow(new Date(location.timestamp), { addSuffix: true }) : 'Unknown'}</p>
+              <p class="text-sm text-gray-600">Last update: ${location.timestamp ? formatDistanceToNow(toGmtPlus1(location.timestamp), { addSuffix: true }) : 'Unknown'}</p>
             </div>
           `
         });
@@ -453,7 +461,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
                     content: `
                       <div class="p-2">
                         <h4 class="font-semibold">${popupTitle}</h4>
-                        <p class="text-sm">${new Date(location.timestamp).toLocaleString()}</p>
+                        <p class="text-sm">${toGmtPlus1(location.timestamp).toLocaleString()}</p>
                         <p class="text-xs text-gray-500">Lat: ${location.latitude}, Lng: ${location.longitude}</p>
                       </div>
                     `
@@ -618,7 +626,7 @@ const GoogleMapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = 
                 <div>
                   <span className="text-muted-foreground">Last Update:</span>
                   <p className="font-medium">
-                    {formatDistanceToNow(new Date(selectedPhone.last_update), { addSuffix: true })}
+                    {formatDistanceToNow(toGmtPlus1(selectedPhone.last_update), { addSuffix: true })}
                   </p>
                 </div>
                 {selectedPhone.users && (

@@ -238,7 +238,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
     let bounds = new mapboxgl.LngLatBounds();
     let hasValidLocations = false;
 
-    phones.forEach(phone => {
+  phones.forEach(phone => {
       const location = phoneLocations[phone.phone_id];
       console.log(`Processing phone ${phone.phone_id}:`, location);
       
@@ -260,11 +260,18 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
         el.style.backgroundColor = selectedPhone?.phone_id === phone.phone_id ? '#ef4444' : '#3b82f6';
 
         // Create popup
+        // Helper to render last update in GMT+1 consistently
+        const toGmtPlus1 = (input: string | Date | undefined | null) => {
+          if (!input) return undefined as unknown as Date;
+          const d = new Date(input);
+          return new Date(d.getTime() + 60 * 60 * 1000);
+        };
+
         const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
           <div class="p-2">
             <h4 class="font-semibold">${phone.name}</h4>
             <p class="text-sm text-gray-600">ID: ${phone.phone_id}</p>
-            <p class="text-sm text-gray-600">Last update: ${formatDistanceToNow(new Date(phone.last_update), { addSuffix: true })}</p>
+            <p class="text-sm text-gray-600">Last update: ${formatDistanceToNow(toGmtPlus1(phone.last_update), { addSuffix: true })}</p>
           </div>
         `);
 
@@ -567,7 +574,7 @@ const MapView = ({ selectedPhone, phones, trackingData = {}, fullScreen = false,
                 <div>
                   <span className="text-muted-foreground">Last Update:</span>
                   <p className="font-medium">
-                    {formatDistanceToNow(new Date(selectedPhone.last_update), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(new Date(selectedPhone.last_update).getTime() + 60 * 60 * 1000), { addSuffix: true })}
                   </p>
                 </div>
                 {selectedPhone.users && (
